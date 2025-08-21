@@ -227,7 +227,7 @@ This project is in active development. Current focus areas:
 
 ## 📝 License
 
-License pending - see [LICENSE](LICENSE) file once added.
+License to be determined.
 
 ## 🙏 Acknowledgments
 
