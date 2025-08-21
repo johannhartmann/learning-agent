@@ -190,10 +190,8 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ## 📚 Documentation
 
-- [Architecture Overview](docs/architecture.md)
-- [API Reference](docs/api.md)
-- [Learning System](docs/learning.md)
 - [Testing Strategy](tests/README.md)
+- [Contributing Guidelines](CONTRIBUTING.md)
 
 ## 🔧 Configuration
 
