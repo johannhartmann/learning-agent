@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+        "LangSmith API MCP Server": {
+            "command": "uvx",
+            "args": [
+                "langsmith-mcp-server"
+            ],
+            "env": {
+                "LANGSMITH_API_KEY": "lsv2_pt_1234"
+            }
+        }
+    }
+}

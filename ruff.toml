@@ -1,0 +1,107 @@
+# Ruff configuration file
+
+target-version = "py311"
+line-length = 100
+fix = true
+output-format = "grouped"
+show-fixes = true
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "ARG",  # flake8-unused-arguments
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+    "PTH",  # flake8-use-pathlib
+    "ERA",  # flake8-eradicate
+    "N",    # pep8-naming
+    "RUF",  # ruff-specific rules
+    "TID",  # flake8-tidy-imports
+    "TRY",  # tryceratops
+    "FLY",  # flynt
+    "PERF", # perflint
+    "FURB", # refurb
+    "LOG",  # flake8-logging
+    "RET",  # flake8-return
+    "SLF",  # flake8-self
+    "SLOT", # flake8-slots
+    "INT",  # flake8-gettext
+    "PIE",  # flake8-pie
+]
+
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "B905",   # zip without strict parameter
+    "C901",   # too complex
+    "TRY003", # avoid specifying long messages outside exception class
+    "RET504", # unnecessary assignment before return
+    "SIM108", # ternary operator vs if-else
+]
+
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[lint.per-file-ignores]
+"tests/*" = [
+    "ARG",  # unused function arguments
+    "S101", # assert usage
+    "ERA",  # commented-out code
+    "TRY",  # exception handling in tests
+    "SLF",  # private member access
+]
+"__init__.py" = [
+    "F401", # unused imports
+    "F403", # star imports
+]
+"src/learning_agent/cli.py" = [
+    "T201", # print statements allowed in CLI
+]
+
+[lint.isort]
+known-first-party = ["learning_agent"]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+combine-as-imports = true
+split-on-trailing-comma = true
+lines-after-imports = 2
+
+[lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "double"
+multiline-quotes = "double"
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
+docstring-code-format = true
+docstring-code-line-length = 80
