@@ -9,12 +9,12 @@ A sophisticated autonomous agent system that learns from experience, orchestrate
 
 ## ✨ Features
 
-- **🔄 Autonomous Learning**: Learns from every task execution, building a memory of successful patterns
-- **⚡ Parallel Orchestration**: Executes multiple tasks simultaneously using LangGraph's Send API
-- **🧩 Multi-Agent Coordination**: Dynamic sub-agent spawning with isolated execution contexts
-- **📝 Narrative Memory**: Creates human-readable narratives of experiences for better context understanding
+- **🎭 DeepAgents Framework**: Built on [deepagents](https://github.com/langchain-ai/deepagents) for sophisticated agent orchestration
+- **🔄 Autonomous Learning**: Learns from every task execution using langmem and narrative memories
+- **⚡ Parallel Sub-Agents**: Multiple specialized sub-agents working in parallel via deepagents' task tool
+- **📝 Narrative Memory**: Creates human-readable narratives of experiences with deep reflection
 - **🔍 Pattern Recognition**: Automatically identifies and applies successful patterns to new tasks
-- **🎯 Checkpoint/Resume**: Full state persistence for long-running tasks
+- **🗂️ Virtual File System**: Safe file operations through deepagents' virtual filesystem
 - **📊 LangSmith Integration**: Complete observability of agent execution and learning processes
 
 ## 🚀 Quick Start
@@ -47,11 +47,11 @@ cp .env.example .env
 
 ```python
 import asyncio
-from learning_agent.supervisor import Supervisor
+from learning_agent.learning_supervisor import LearningSupervisor
 
 async def main():
-    # Initialize the supervisor
-    supervisor = Supervisor()
+    # Initialize the learning supervisor
+    supervisor = LearningSupervisor()
 
     # Process a task - the agent will plan, execute, and learn
     result = await supervisor.process_task(
@@ -69,36 +69,63 @@ async def main():
 asyncio.run(main())
 ```
 
+### Using the DeepAgents API Directly
+
+```python
+from learning_agent.agent import create_learning_agent
+from learning_agent.state import LearningAgentState
+
+# Create a deepagents-based learning agent
+agent = create_learning_agent()
+
+# Create initial state
+initial_state: LearningAgentState = {
+    "messages": [{"role": "user", "content": "Your task here"}],
+    "todos": [],
+    "files": {},
+    "memories": [],
+    "patterns": [],
+    "learning_queue": [],
+}
+
+# Execute task
+result = await agent.ainvoke(initial_state)
+```
+
 ## 🏗️ Architecture
 
-The Learning Agent uses a sophisticated multi-layer architecture:
+The Learning Agent combines DeepAgents framework with narrative learning:
 
 ```mermaid
 graph TD
-    A[Supervisor] -->|Orchestrates| B[LangGraph State Machine]
-    B --> C[Memory Check]
-    B --> D[Task Planning]
-    B --> E[Parallel Execution]
-    B --> F[Learning Queue]
+    A[LearningSupervisor] -->|Wraps| B[DeepAgents Agent]
+    B --> C[Built-in Planning Tool]
+    B --> D[Task Tool for Sub-Agents]
+    B --> E[Virtual File System]
+    B --> F[Learning Tools]
 
-    E -->|Spawns| G[Sub-Agent Pool]
-    G --> H[Isolated Executors]
+    D -->|Delegates to| G[Specialized Sub-Agents]
+    G --> H[learning-query]
+    G --> I[execution-specialist]
+    G --> J[reflection-analyst]
+    G --> K[planning-strategist]
 
-    F -->|Background| I[Narrative Learning]
-    I --> J[Deep Reflection]
-    I --> K[Pattern Consolidation]
+    A -->|Background| L[Narrative Learner]
+    L --> M[LangMem Processing]
+    L --> N[FAISS Vector Store]
+    L --> O[Pattern Extraction]
 
-    C -->|Queries| L[Vector Memory Store]
-    K -->|Updates| L
+    F -->|Interacts with| L
 ```
 
 ### Core Components
 
-- **Supervisor**: Main orchestrator using LangGraph for state management
-- **Narrative Learner**: Creates and maintains episodic memories with reflection
-- **Orchestrator**: Manages parallel task execution with dependency resolution
-- **Sub-Agents**: Isolated execution environments for individual tasks
-- **Memory Store**: Vector database for similarity-based experience retrieval
+- **LearningSupervisor**: Integrates deepagents with background learning system
+- **DeepAgents Agent**: Core agent built with `create_deep_agent()` providing planning and sub-agent orchestration
+- **Specialized Sub-Agents**: Four specialized agents for different aspects of task execution
+- **Narrative Learner**: Creates and maintains episodic memories using langmem
+- **Learning Tools**: Custom tools for memory search, pattern application, and learning queue
+- **Virtual File System**: DeepAgents' safe file operations for parallel execution
 
 ## 🧪 Testing Strategy
 

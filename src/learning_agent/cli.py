@@ -13,7 +13,7 @@ from rich.table import Table
 
 from learning_agent import __version__
 from learning_agent.config import settings
-from learning_agent.supervisor.supervisor import Supervisor
+from learning_agent.learning_supervisor import LearningSupervisor
 
 
 app = typer.Typer(
@@ -79,7 +79,7 @@ async def execute_task(task: str) -> None:
 
         try:
             # Initialize supervisor
-            supervisor = Supervisor()
+            supervisor = LearningSupervisor()
 
             # Create progress callback
             async def update_progress(message: str) -> None:
@@ -110,7 +110,7 @@ async def interactive_mode() -> None:
         )
     )
 
-    supervisor = Supervisor()
+    supervisor = LearningSupervisor()
 
     while True:
         try:
@@ -224,7 +224,7 @@ def display_results(result: dict[str, Any]) -> None:
                 console.print(f"    Error: {error}")
 
 
-async def show_status(supervisor: Supervisor) -> None:  # noqa: ARG001
+async def show_status(supervisor: LearningSupervisor) -> None:  # noqa: ARG001
     """Show current supervisor status."""
     # Status method not yet implemented
     status = {"state": "ready", "tasks_completed": 0}
@@ -233,7 +233,7 @@ async def show_status(supervisor: Supervisor) -> None:  # noqa: ARG001
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="white")
 
-    table.add_row("Current Task", status.get("current_task", "None"))
+    table.add_row("Current Task", str(status.get("current_task", "None")))
     table.add_row("Active Todos", str(status.get("active_todos", 0)))
     table.add_row("Pending Todos", str(status.get("pending_todos", 0)))
     table.add_row("Completed Todos", str(status.get("completed_todos", 0)))
@@ -248,7 +248,7 @@ async def show_status(supervisor: Supervisor) -> None:  # noqa: ARG001
     console.print(table)
 
 
-def show_statistics(supervisor: Supervisor) -> None:  # noqa: ARG001
+def show_statistics(supervisor: LearningSupervisor) -> None:  # noqa: ARG001
     """Show learning system statistics."""
     # Statistics method not yet implemented
     stats = {"total_memories": 0, "patterns_learned": 0, "success_rate": 0.0}
