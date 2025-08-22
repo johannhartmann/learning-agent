@@ -78,15 +78,15 @@ def learning_queue_reducer(
     return left + right
 
 
-class LearningAgentState(DeepAgentState):
+class LearningAgentState(DeepAgentState):  # type: ignore[misc]
     """Extended state for learning agent with memory and pattern tracking."""
 
     # Learning-specific state
-    memories: NotRequired[Annotated[list[Memory], memory_reducer]]
-    patterns: NotRequired[Annotated[list[Pattern], pattern_reducer]]
-    current_context: NotRequired[dict[str, Any]]
-    learning_queue: NotRequired[Annotated[list[ExecutionData], learning_queue_reducer]]
+    memories: NotRequired[Annotated[list[Memory], memory_reducer]]  # type: ignore[valid-type]
+    patterns: NotRequired[Annotated[list[Pattern], pattern_reducer]]  # type: ignore[valid-type]
+    current_context: NotRequired[dict[str, Any]]  # type: ignore[valid-type]
+    learning_queue: NotRequired[Annotated[list[ExecutionData], learning_queue_reducer]]  # type: ignore[valid-type]
 
     # Quick context for current task
-    relevant_memories: NotRequired[list[str]]
-    applicable_patterns: NotRequired[list[str]]
+    relevant_memories: NotRequired[list[str]]  # type: ignore[valid-type]
+    applicable_patterns: NotRequired[list[str]]  # type: ignore[valid-type]
