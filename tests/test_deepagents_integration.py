@@ -1,0 +1,202 @@
+"""Integration tests for the deepagents-based Learning Agent."""
+
+import asyncio
+import tempfile
+from pathlib import Path
+
+import pytest
+
+from learning_agent.agent import create_learning_agent
+from learning_agent.learning.narrative_learner import NarrativeLearner
+from learning_agent.learning_supervisor import LearningSupervisor
+from learning_agent.state import ExecutionData, LearningAgentState, Memory, Pattern
+
+
+class TestLearningAgent:
+    """Test the deepagents-based learning agent."""
+
+    def test_create_agent(self):
+        """Test creating a learning agent."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            agent = create_learning_agent(storage_path=Path(tmpdir))
+            assert agent is not None
+
+    @pytest.mark.asyncio
+    async def test_agent_with_state(self):
+        """Test agent invocation with custom state."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            agent = create_learning_agent(storage_path=Path(tmpdir))
+
+            # Create initial state
+            initial_state: LearningAgentState = {
+                "messages": [{"role": "user", "content": "Say hello"}],
+                "todos": [],
+                "files": {},
+                "memories": [],
+                "patterns": [],
+                "learning_queue": [],
+                "relevant_memories": [],
+                "applicable_patterns": [],
+            }
+
+            # Invoke agent
+            result = await agent.ainvoke(initial_state)
+
+            assert result is not None
+            assert "messages" in result
+            assert len(result["messages"]) > 1  # Should have response
+
+
+class TestLearningSupervisor:
+    """Test the learning supervisor integration."""
+
+    @pytest.mark.asyncio
+    async def test_supervisor_simple_task(self):
+        """Test supervisor with a simple task."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            supervisor = LearningSupervisor(storage_path=Path(tmpdir))
+
+            # Process a simple task
+            result = await supervisor.process_task("Say hello")
+
+            assert result is not None
+            assert "status" in result
+            assert "duration" in result
+            assert "thread_id" in result
+            assert "learning_queued" in result
+
+            # Cleanup
+            await supervisor.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_supervisor_with_context(self):
+        """Test supervisor with context."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            supervisor = LearningSupervisor(storage_path=Path(tmpdir))
+
+            # Process task with context
+            result = await supervisor.process_task(
+                "Count to 3", context="This is a test environment"
+            )
+
+            assert result is not None
+            assert result["task"] == "Count to 3"
+            assert "summary" in result
+
+            # Cleanup
+            await supervisor.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_supervisor_learning_stats(self):
+        """Test getting learning statistics."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            supervisor = LearningSupervisor(storage_path=Path(tmpdir))
+
+            stats = await supervisor.get_learning_stats()
+
+            assert stats is not None
+            assert "memories_count" in stats
+            assert "patterns_count" in stats
+            assert "background_processor_active" in stats
+            assert "storage_path" in stats
+
+            # Cleanup
+            await supervisor.shutdown()
+
+
+class TestNarrativeLearner:
+    """Test the narrative learner with deepagents integration."""
+
+    @pytest.mark.asyncio
+    async def test_narrative_learner_quick_context(self):
+        """Test getting quick context."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            learner = NarrativeLearner(storage_path=Path(tmpdir))
+
+            # Get quick context for a task
+            context = await learner.get_quick_context("Write a function")
+
+            assert context is not None
+            assert "has_prior_experience" in context
+            assert "recent_memories" in context
+            assert isinstance(context["recent_memories"], list)
+
+    @pytest.mark.asyncio
+    async def test_narrative_learner_background_processing(self):
+        """Test background learning processing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            learner = NarrativeLearner(storage_path=Path(tmpdir))
+
+            # Start background processor
+            await learner.start_background_processor()
+
+            # Schedule learning
+            execution_data = {
+                "task": "Test task",
+                "context": None,
+                "outcome": "success",
+                "duration": 1.0,
+                "description": "Test completed",
+                "error": None,
+            }
+
+            learner.schedule_post_execution_learning(execution_data)
+
+            # Give it time to process
+            await asyncio.sleep(0.5)
+
+            # Stop background processor
+            await learner.stop_background_processor()
+
+
+class TestLearningState:
+    """Test the learning agent state."""
+
+    def test_memory_creation(self):
+        """Test creating a memory."""
+        from datetime import datetime
+        from uuid import uuid4
+
+        memory = Memory(
+            id=str(uuid4()),
+            task="Test task",
+            context="Test context",
+            narrative="This is a test narrative",
+            reflection="This is a test reflection",
+            outcome="success",
+            timestamp=datetime.now().isoformat(),
+        )
+
+        assert memory.task == "Test task"
+        assert memory.outcome == "success"
+
+    def test_pattern_creation(self):
+        """Test creating a pattern."""
+        from uuid import uuid4
+
+        pattern = Pattern(
+            id=str(uuid4()),
+            description="Test pattern",
+            confidence=0.9,
+            success_rate=0.85,
+            applications=5,
+        )
+
+        assert pattern.confidence == 0.9
+        assert pattern.success_rate == 0.85
+        assert pattern.applications == 5
+
+    def test_execution_data(self):
+        """Test execution data creation."""
+        exec_data = ExecutionData(
+            task="Test task",
+            context="Test context",
+            outcome="success",
+            duration=2.5,
+            description="Test description",
+            error=None,
+        )
+
+        assert exec_data.task == "Test task"
+        assert exec_data.outcome == "success"
+        assert exec_data.duration == 2.5
