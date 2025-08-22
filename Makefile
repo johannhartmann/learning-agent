@@ -141,6 +141,39 @@ langsmith-anomaly: ## Detect anomalies in production traces
 langsmith-ab: ## Run A/B testing between configurations
 	$(UV) run python -c "import asyncio; from tests.langsmith_eval import ab_test_configurations; import json; result = asyncio.run(ab_test_configurations()); print(json.dumps(result, indent=2))"
 
+## UI and Server targets
+docker-build: ## Build Docker images for server and UI
+	docker-compose build
+
+docker-up: ## Start server and UI with Docker Compose
+	docker-compose up -d
+	@echo "Server running at: http://localhost:2024"
+	@echo "UI running at: http://localhost:3000"
+
+docker-down: ## Stop Docker containers
+	docker-compose down
+
+docker-logs: ## View Docker container logs
+	docker-compose logs -f
+
+docker-restart: ## Restart Docker containers
+	docker-compose restart
+
+docker-clean: ## Stop and remove Docker containers and volumes
+	docker-compose down -v
+
+server-dev: ## Run LangGraph server in development mode (local)
+	langgraph dev --port 2024
+
+ui-dev: ## Run UI in development mode (requires npm install in ui/)
+	cd ui && npm run dev
+
+ui-install: ## Install UI dependencies locally
+	cd ui && npm install
+
+ui-build: ## Build UI for production
+	cd ui && npm run build
+
 test-all: ## Run all test suites (unit, integration, langsmith)
 	@echo "Running complete test suite..."
 	@$(MAKE) test-unit

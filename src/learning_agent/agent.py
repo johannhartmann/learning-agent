@@ -115,3 +115,22 @@ def create_learning_agent(
     )
 
     return agent
+
+
+def create_learning_agent_graph(
+    storage_path: Path | None = None,
+    model: str | None = None,
+) -> object:
+    """Create the learning agent as a LangGraph graph.
+
+    This is a convenience function that returns the agent
+    in a form that can be used with LangGraph server.
+
+    Args:
+        storage_path: Path for learning storage (defaults to .agent/)
+        model: Model name to use (defaults to config setting)
+
+    Returns:
+        The learning agent ready for graph operations
+    """
+    return create_learning_agent(storage_path, model)

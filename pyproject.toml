@@ -214,4 +214,5 @@ exclude_lines = [
 [dependency-groups]
 dev = [
     "bandit>=1.8.6",
+    "langgraph-cli[inmem]>=0.3.8",
 ]

@@ -1,0 +1,43 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "learning_agent": "src.learning_agent.server:graph"
+  },
+  "env": {
+    "OPENAI_API_KEY": {
+      "type": "string",
+      "description": "OpenAI API key for LLM operations"
+    },
+    "ANTHROPIC_API_KEY": {
+      "type": "string",
+      "description": "Anthropic API key for Claude models"
+    },
+    "LANGSMITH_API_KEY": {
+      "type": "string",
+      "description": "LangSmith API key for tracing"
+    },
+    "LANGSMITH_TRACING": {
+      "type": "string",
+      "default": "true",
+      "description": "Enable LangSmith tracing"
+    },
+    "LANGSMITH_PROJECT": {
+      "type": "string",
+      "default": "learning-agent",
+      "description": "LangSmith project name"
+    },
+    "LLM_PROVIDER": {
+      "type": "string",
+      "default": "openai",
+      "description": "LLM provider to use"
+    },
+    "LLM_MODEL": {
+      "type": "string",
+      "default": "gpt-4o-mini",
+      "description": "LLM model to use"
+    }
+  },
+  "python_version": "3.11",
+  "pip_config_file": null,
+  "dockerfile": null
+}

@@ -24,6 +24,7 @@ A sophisticated autonomous agent system that learns from experience, orchestrate
 - Python 3.11 or higher
 - [uv](https://github.com/astral-sh/uv) package manager (recommended) or pip
 - OpenAI API key or other supported LLM provider
+- Docker and Docker Compose (for UI)
 
 ### Installation
 
@@ -69,6 +70,53 @@ async def main():
 asyncio.run(main())
 ```
 
+### 🖥️ Web UI (New!)
+
+The Learning Agent now includes a web-based UI powered by deep-agents-ui. This provides a visual interface for interacting with the agent.
+
+#### Quick Start with Docker
+
+```bash
+# Build and start both server and UI
+make docker-up
+
+# Access the UI at http://localhost:3000
+# The LangGraph server runs at http://localhost:2024
+```
+
+#### Manual Setup
+
+1. **Start the LangGraph Server**:
+```bash
+make server-dev
+```
+
+2. **Start the UI** (in a new terminal):
+```bash
+make ui-dev
+```
+
+3. **Access the UI** at http://localhost:3000
+
+#### Docker Commands
+
+```bash
+# Build Docker images
+make docker-build
+
+# Start containers
+make docker-up
+
+# View logs
+make docker-logs
+
+# Stop containers
+make docker-down
+
+# Clean up (including volumes)
+make docker-clean
+```
+
 ### Using the DeepAgents API Directly
 
 ```python
@@ -94,11 +142,15 @@ result = await agent.ainvoke(initial_state)
 
 ## 🏗️ Architecture
 
-The Learning Agent combines DeepAgents framework with narrative learning:
+The Learning Agent combines DeepAgents framework with narrative learning and now includes a web UI:
 
 ```mermaid
 graph TD
-    A[LearningSupervisor] -->|Wraps| B[DeepAgents Agent]
+    UI[Web UI - deep-agents-ui] -->|HTTP/WebSocket| Server[LangGraph Server]
+    CLI[CLI Interface] --> A[LearningSupervisor]
+
+    Server --> A
+    A -->|Wraps| B[DeepAgents Agent]
     B --> C[Built-in Planning Tool]
     B --> D[Task Tool for Sub-Agents]
     B --> E[Virtual File System]
@@ -120,6 +172,8 @@ graph TD
 
 ### Core Components
 
+- **Web UI**: Next.js-based interface for visual interaction with the agent
+- **LangGraph Server**: Serves the agent as an API endpoint for the UI
 - **LearningSupervisor**: Integrates deepagents with background learning system
 - **DeepAgents Agent**: Core agent built with `create_deep_agent()` providing planning and sub-agent orchestration
 - **Specialized Sub-Agents**: Four specialized agents for different aspects of task execution

@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # LangGraph server for the learning agent
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: learning-agent-server
+    ports:
+      - "2024:2024"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - LANGSMITH_TRACING=true
+      - LANGSMITH_PROJECT=learning-agent
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+    volumes:
+      - ./src:/app/src:ro
+      - ./.agent:/app/.agent
+    networks:
+      - learning-agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2024/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Deep Agents UI
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    container_name: learning-agent-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_DEPLOYMENT_URL=http://server:2024
+      - NEXT_PUBLIC_AGENT_ID=learning_agent
+      - NEXT_PUBLIC_LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+    depends_on:
+      - server
+    networks:
+      - learning-agent-network
+
+networks:
+  learning-agent-network:
+    driver: bridge
+
+volumes:
+  agent-data:

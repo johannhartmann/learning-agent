@@ -1,0 +1,34 @@
+# Dockerfile for LangGraph server
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy project files
+COPY pyproject.toml .
+COPY src/ ./src/
+COPY langgraph.json .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir uv && \
+    uv pip install --system .
+
+# Install langgraph-cli
+RUN uv pip install --system "langgraph-cli[inmem]"
+
+# Expose port for LangGraph server
+EXPOSE 2024
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV LANGSMITH_TRACING=true
+ENV LANGSMITH_PROJECT=learning-agent
+
+# Run the LangGraph server
+CMD ["langgraph", "dev", "--host", "0.0.0.0", "--port", "2024"]
