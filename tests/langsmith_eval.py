@@ -12,7 +12,7 @@ from langsmith import Client
 from langsmith.evaluation import evaluate
 from langsmith.schemas import Example, Run
 
-from learning_agent.supervisor import Supervisor
+from learning_agent.learning_supervisor import LearningSupervisor
 
 
 # Initialize LangSmith client
@@ -195,7 +195,7 @@ async def run_probabilistic_tests():
     """Run probabilistic tests using LangSmith evaluation."""
 
     # Initialize supervisor
-    supervisor = Supervisor()
+    supervisor = LearningSupervisor()
 
     # Define the target function to test
     async def target_function(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -331,14 +331,14 @@ async def ab_test_configurations():
     """Run A/B tests between different configurations."""
 
     # Configuration A: Default settings
-    supervisor_a = Supervisor()
+    supervisor_a = LearningSupervisor()
 
     # Configuration B: Modified settings (e.g., different LLM temperature)
     import learning_agent.config as config
 
     original_temp = config.settings.llm_temperature
     config.settings.llm_temperature = 0.3
-    supervisor_b = Supervisor()
+    supervisor_b = LearningSupervisor()
 
     # Test dataset
     test_inputs = [
