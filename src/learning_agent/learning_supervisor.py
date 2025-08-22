@@ -98,16 +98,17 @@ class LearningSupervisor:
             error_msg = None
             description = "Task completed successfully"
 
-            if "error" in str(result).lower() or "failed" in str(result).lower():
+            # Extract meaningful description from result
+            if result.get("messages"):
+                last_message = result["messages"][-1]
+                if hasattr(last_message, "content"):
+                    description = last_message.content[:500]
+
+            # Check for actual errors (not just the word "message" in the result)
+            if isinstance(result.get("error"), str):
                 outcome = "failure"
-                error_msg = str(result)
+                error_msg = result["error"]
                 description = f"Task failed: {error_msg}"
-            else:
-                # Extract meaningful description from result
-                if result.get("messages"):
-                    last_message = result["messages"][-1]
-                    if hasattr(last_message, "content"):
-                        description = last_message.content[:500]
 
             # Schedule background learning
             self.narrative_learner.schedule_post_execution_learning(

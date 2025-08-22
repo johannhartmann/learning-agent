@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from deepagents import create_deep_agent
+from deepagents.tools import edit_file, ls, read_file, write_file, write_todos
 
 from learning_agent.config import settings
 from learning_agent.learning.tools import create_learning_tools
@@ -94,9 +95,19 @@ def create_learning_agent(
     # Create learning tools
     learning_tools = create_learning_tools()
 
+    # Combine with deepagents built-in tools
+    all_tools = [
+        *learning_tools,  # Learning-specific tools
+        write_todos,  # Planning and task tracking
+        ls,  # List directory contents
+        read_file,  # Read file contents
+        write_file,  # Write files
+        edit_file,  # Edit existing files
+    ]
+
     # Create the agent
     agent = create_deep_agent(
-        tools=learning_tools,
+        tools=all_tools,
         instructions=LEARNING_AGENT_INSTRUCTIONS,
         model=llm,
         subagents=LEARNING_SUBAGENTS,
