@@ -148,7 +148,7 @@ docker-build: ## Build Docker images for server and UI
 docker-up: ## Start server and UI with Docker Compose
 	docker-compose up -d
 	@echo "Server running at: http://localhost:2024"
-	@echo "UI running at: http://localhost:3000"
+	@echo "UI running at: http://localhost:10300"
 
 docker-down: ## Stop Docker containers
 	docker-compose down
