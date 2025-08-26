@@ -102,7 +102,7 @@ Extract learnings from this task execution with specific, actionable insights.""
                 [HumanMessage(content=extraction_prompt)]
             )
 
-            if learning_result:
+            if learning_result and isinstance(learning_result, LearningExtraction):
                 from datetime import datetime
                 from uuid import uuid4
 
