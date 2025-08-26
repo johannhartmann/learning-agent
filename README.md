@@ -80,7 +80,7 @@ The Learning Agent now includes a web-based UI powered by deep-agents-ui. This p
 # Build and start both server and UI
 make docker-up
 
-# Access the UI at http://localhost:3000
+# Access the UI at http://localhost:10300
 # The LangGraph server runs at http://localhost:2024
 ```
 
@@ -96,7 +96,7 @@ make server-dev
 make ui-dev
 ```
 
-3. **Access the UI** at http://localhost:3000
+3. **Access the UI** at http://localhost:3000 (or configured port)
 
 #### Docker Commands
 

@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy project files
 COPY pyproject.toml .
+COPY README.md .
 COPY src/ ./src/
 COPY langgraph.json .
 
@@ -22,13 +23,20 @@ RUN pip install --no-cache-dir uv && \
 # Install langgraph-cli
 RUN uv pip install --system "langgraph-cli[inmem]"
 
-# Expose port for LangGraph server
-EXPOSE 2024
+# Expose ports for both servers
+EXPOSE 2024 8001
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV LANGSMITH_TRACING=true
 ENV LANGSMITH_PROJECT=learning-agent
+ENV DOCKER_ENV=1
 
-# Run the LangGraph server
-CMD ["langgraph", "dev", "--host", "0.0.0.0", "--port", "2024"]
+# Copy scripts
+COPY scripts/start_servers.sh /app/scripts/
+
+# Make script executable
+RUN chmod +x /app/scripts/start_servers.sh
+
+# Run both servers
+CMD ["/app/scripts/start_servers.sh"]

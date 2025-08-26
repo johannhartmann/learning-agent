@@ -6,10 +6,10 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-import asyncpg  # type: ignore[import-untyped]
+import asyncpg  # type: ignore[import-untyped, unused-ignore]
 import numpy as np
 from langchain_openai import OpenAIEmbeddings
-from pgvector.asyncpg import register_vector  # type: ignore[import-untyped]
+from pgvector.asyncpg import register_vector  # type: ignore[import-untyped, unused-ignore]
 
 
 class VectorLearningStorage:

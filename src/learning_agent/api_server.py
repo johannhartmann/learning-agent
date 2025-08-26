@@ -148,5 +148,5 @@ if __name__ == "__main__":
     import uvicorn
 
     # In Docker, bind to all interfaces; locally bind to localhost
-    host = "0.0.0.0" if os.environ.get("DOCKER_ENV") else "127.0.0.1"
-    uvicorn.run(app, host=host, port=8001)  # nosec B104
+    host = "0.0.0.0" if os.environ.get("DOCKER_ENV") else "127.0.0.1"  # nosec B104
+    uvicorn.run(app, host=host, port=8001)

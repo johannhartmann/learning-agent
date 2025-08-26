@@ -74,7 +74,7 @@ class LangMemLearningSystem:
             # Analyze execution trace for inefficiencies
             from learning_agent.learning.execution_analyzer import ExecutionAnalyzer
 
-            analyzer = ExecutionAnalyzer()  # type: ignore[no-untyped-call]
+            analyzer = ExecutionAnalyzer()
             execution_analysis = analyzer.analyze_conversation(
                 [{"content": part} for part in narrative_parts]
             )

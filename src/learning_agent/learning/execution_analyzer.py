@@ -8,12 +8,12 @@ from typing import Any
 class ExecutionAnalyzer:
     """Analyzes execution traces to identify patterns, inefficiencies, and learning opportunities."""
 
-    def __init__(self):
-        self.tool_sequence = []
-        self.tool_counts = Counter()
-        self.redundancies = []
-        self.missed_opportunities = []
-        self.decision_points = []
+    def __init__(self) -> None:
+        self.tool_sequence: list[str] = []
+        self.tool_counts: Counter[str] = Counter()
+        self.redundancies: list[dict[str, Any]] = []
+        self.missed_opportunities: list[dict[str, Any]] = []
+        self.decision_points: list[dict[str, Any]] = []
 
     def analyze_conversation(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
         """Analyze a conversation to extract execution metadata and patterns.
