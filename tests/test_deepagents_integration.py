@@ -2,6 +2,7 @@
 
 import asyncio
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,32 @@ import pytest
 from learning_agent.agent import create_learning_agent
 from learning_agent.learning.narrative_learner import NarrativeLearner
 from learning_agent.learning_supervisor import LearningSupervisor
-from learning_agent.state import ExecutionData, LearningAgentState, Memory, Pattern
+from learning_agent.state import ExecutionData, LearningAgentState
+
+
+# Test data classes
+@dataclass
+class Memory:
+    """Test memory class."""
+
+    id: str
+    task: str
+    context: str
+    narrative: str
+    reflection: str
+    outcome: str
+    timestamp: str
+
+
+@dataclass
+class Pattern:
+    """Test pattern class."""
+
+    id: str
+    description: str
+    confidence: float
+    success_rate: float
+    applications: int
 
 
 class TestLearningAgent:
