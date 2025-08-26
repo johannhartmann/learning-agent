@@ -122,7 +122,7 @@ class ExecutionAnalyzer:
 
     def _identify_inefficiencies(self) -> list[dict[str, Any]]:
         """Identify inefficient tool usage patterns."""
-        inefficiencies = []
+        inefficiencies: list[dict[str, Any]] = []
 
         # Check if search_memory was called first (best practice)
         if self.tool_sequence and self.tool_sequence[0] != "search_memory":
