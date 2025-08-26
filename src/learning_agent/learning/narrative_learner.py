@@ -18,8 +18,6 @@ try:
     from langsmith import traceable
 except ImportError:
     # Fallback if langsmith is not installed
-    from typing import Any
-
     def traceable(**kwargs: Any) -> Any:  # noqa: ARG001
         def decorator(func: Any) -> Any:
             return func
@@ -195,7 +193,10 @@ Write this as a story I'm telling my future self - conversational, insightful, a
         structured_llm = self.llm.with_structured_output(NarrativeMemory)
         config = {"callbacks": callbacks} if callbacks else {}
         narrative_response = await structured_llm.ainvoke(narrative_prompt, config=config)
-        narrative = narrative_response.narrative
+        if isinstance(narrative_response, NarrativeMemory):
+            narrative = narrative_response.narrative
+        else:
+            narrative = str(narrative_response)
 
         # Store the narrative with its embedding
         await self._store_narrative(narrative)
@@ -245,7 +246,9 @@ Tell me what you learned about task sequencing and dependencies."""
         reflections.append(
             (
                 "Order and Dependencies",
-                order_reflection.reflection,
+                order_reflection.reflection
+                if isinstance(order_reflection, ReflectionOutput)
+                else str(order_reflection),
             )
         )
 
@@ -270,7 +273,9 @@ Share your honest assessment of tool selection."""
         reflections.append(
             (
                 "Tool Selection",
-                tool_reflection.reflection,
+                tool_reflection.reflection
+                if isinstance(tool_reflection, ReflectionOutput)
+                else str(tool_reflection),
             )
         )
 
@@ -295,7 +300,9 @@ Be ruthless about unnecessary complexity."""
         reflections.append(
             (
                 "Efficiency",
-                efficiency_reflection.reflection,
+                efficiency_reflection.reflection
+                if isinstance(efficiency_reflection, ReflectionOutput)
+                else str(efficiency_reflection),
             )
         )
 
@@ -322,7 +329,9 @@ Give me your honest, detailed analysis of what went wrong."""
             reflections.append(
                 (
                     "Failure Analysis",
-                    failure_reflection.reflection,
+                    failure_reflection.reflection
+                    if isinstance(failure_reflection, ReflectionOutput)
+                    else str(failure_reflection),
                 )
             )
 
@@ -347,7 +356,9 @@ Share the broader lessons that apply beyond this specific task."""
         reflections.append(
             (
                 "Generalization",
-                generalization_reflection.reflection,
+                generalization_reflection.reflection
+                if isinstance(generalization_reflection, ReflectionOutput)
+                else str(generalization_reflection),
             )
         )
 
@@ -366,7 +377,9 @@ and what wisdom was gained from this experience."""
 
         structured_llm = self.llm.with_structured_output(NarrativeMemory)
         synthesis = await structured_llm.ainvoke(synthesis_prompt)
-        unified_narrative = synthesis.narrative
+        unified_narrative = (
+            synthesis.narrative if isinstance(synthesis, NarrativeMemory) else str(synthesis)
+        )
 
         # Store the synthesized learning
         await self._store_narrative(unified_narrative)
@@ -395,7 +408,11 @@ Write a rich description that will help me find similar past experiences."""
 
         structured_llm = self.llm.with_structured_output(QueryEnrichment)
         enriched_query_response = await structured_llm.ainvoke(query_prompt)
-        enriched_query = enriched_query_response.enriched_query
+        enriched_query = (
+            enriched_query_response.enriched_query
+            if isinstance(enriched_query_response, QueryEnrichment)
+            else str(enriched_query_response)
+        )
 
         # Get embedding and search
         query_embedding = await self.embeddings.aembed_query(enriched_query)
@@ -428,7 +445,11 @@ Give me actionable advice based on these past experiences, not just a summary.""
 
             structured_llm = self.llm.with_structured_output(RelevanceAnalysis)
             relevance_analysis = await structured_llm.ainvoke(relevance_prompt)
-            return str(relevance_analysis.analysis)
+            return str(
+                relevance_analysis.analysis
+                if isinstance(relevance_analysis, RelevanceAnalysis)
+                else relevance_analysis
+            )
 
         return ""
 
@@ -463,7 +484,11 @@ Write this as honest advice to myself about my patterns and growth areas."""
 
         structured_llm = self.llm.with_structured_output(PatternAnalysis)
         pattern_analysis = await structured_llm.ainvoke(pattern_prompt)
-        meta_learning = pattern_analysis.patterns
+        meta_learning = (
+            pattern_analysis.patterns
+            if isinstance(pattern_analysis, PatternAnalysis)
+            else str(pattern_analysis)
+        )
 
         # Store this meta-learning as a special memory
         meta_memory = (
@@ -537,7 +562,7 @@ Write this as honest advice to myself about my patterns and growth areas."""
             "confidence": 0.1,
         }
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         """Clean shutdown."""
         await self.stop_background_processor()
         self._save_memories()
