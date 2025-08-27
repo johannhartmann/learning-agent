@@ -1,6 +1,7 @@
 """Integration tests for the deepagents-based Learning Agent."""
 
 import asyncio
+import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,6 +49,10 @@ class TestLearningAgent:
             assert agent is not None
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_agent_with_state(self):
         """Test agent invocation with custom state."""
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -1,5 +1,6 @@
 """Integration tests for the Learning Agent system."""
 
+import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -147,6 +148,10 @@ class TestDeepAgentsIntegration:
         assert agent is not None
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_agent_invocation(self, temp_storage):
         """Test invoking the agent with state."""
         agent = create_learning_agent(storage_path=temp_storage)
