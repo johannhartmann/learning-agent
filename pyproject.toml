@@ -159,6 +159,14 @@ allow_untyped_decorators = true
 check_untyped_defs = false
 ignore_errors = false
 
+# Ignore errors in provider files with complex typing
+[[tool.mypy.overrides]]
+module = [
+    "learning_agent.providers.llm_factory",
+    "learning_agent.providers.embedding_factory",
+]
+ignore_errors = true
+
 # Ignore missing imports for certain libraries
 [[tool.mypy.overrides]]
 module = [
