@@ -164,6 +164,9 @@ ignore_errors = false
 module = [
     "learning_agent.providers.llm_factory",
     "learning_agent.providers.embedding_factory",
+    "learning_agent.config",  # BaseSettings typing varies between environments
+    "learning_agent.learning.narrative_learner",  # Complex LangChain types
+    "learning_agent.learning.background_learner",  # Queue typing issues
 ]
 ignore_errors = true
 

@@ -27,7 +27,7 @@ ensure_env_file()
 load_dotenv()
 
 
-class Settings(BaseSettings):  # type: ignore[misc]
+class Settings(BaseSettings):
     """Application settings with environment variable support."""
 
     model_config = SettingsConfigDict(

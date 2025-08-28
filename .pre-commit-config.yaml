@@ -30,12 +30,7 @@ repos:
           - pydantic>=2.5.0
           - types-aiofiles
         args:
-          - --ignore-missing-imports
-          - --install-types
-          - --non-interactive
-          - --allow-untyped-calls
-          - --allow-untyped-defs
-          - --no-strict-optional
+          - --config-file=pyproject.toml
         exclude: ^(tests/|docs/)
 
   - repo: https://github.com/pycqa/bandit

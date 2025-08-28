@@ -1,5 +1,4 @@
 """Factory for creating provider-agnostic embedding models."""
-# mypy: ignore-errors
 
 import contextlib
 from typing import Any
@@ -42,7 +41,7 @@ def get_embeddings(config: Any) -> Embeddings:
         if base_url:
             kwargs["base_url"] = base_url
 
-        return OpenAIEmbeddings(**kwargs)  # type: ignore[arg-type]
+        return OpenAIEmbeddings(**kwargs)
 
     # Anthropic embeddings
     if embedding_provider == "anthropic":
