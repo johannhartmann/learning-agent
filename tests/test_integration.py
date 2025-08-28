@@ -49,6 +49,10 @@ class TestNarrativeLearner:
     """Test narrative learner functionality."""
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_get_quick_context(self, temp_storage):
         """Test getting quick context for a task."""
         learner = NarrativeLearner(storage_path=temp_storage)
@@ -62,6 +66,10 @@ class TestNarrativeLearner:
         assert isinstance(context["recent_memories"], list)
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_schedule_learning(self, temp_storage):
         """Test scheduling post-execution learning."""
         learner = NarrativeLearner(storage_path=temp_storage)
@@ -97,6 +105,10 @@ class TestLearningSupervisor:
     """Test the learning supervisor."""
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_process_simple_task(self, temp_storage):
         """Test processing a simple task."""
         supervisor = LearningSupervisor(storage_path=temp_storage)
@@ -112,6 +124,10 @@ class TestLearningSupervisor:
         await supervisor.shutdown()
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_process_with_context(self, temp_storage):
         """Test processing with context."""
         supervisor = LearningSupervisor(storage_path=temp_storage)
@@ -125,6 +141,10 @@ class TestLearningSupervisor:
         await supervisor.shutdown()
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_learning_stats(self, temp_storage):
         """Test getting learning statistics."""
         supervisor = LearningSupervisor(storage_path=temp_storage)
@@ -142,6 +162,10 @@ class TestLearningSupervisor:
 class TestDeepAgentsIntegration:
     """Test deepagents integration."""
 
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     def test_create_agent(self, temp_storage):
         """Test creating a deepagents-based agent."""
         agent = create_learning_agent(storage_path=temp_storage)

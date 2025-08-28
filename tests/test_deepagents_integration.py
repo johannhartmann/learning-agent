@@ -42,6 +42,10 @@ class Pattern:
 class TestLearningAgent:
     """Test the deepagents-based learning agent."""
 
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     def test_create_agent(self):
         """Test creating a learning agent."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -82,6 +86,10 @@ class TestLearningSupervisor:
     """Test the learning supervisor integration."""
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_supervisor_simple_task(self):
         """Test supervisor with a simple task."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -100,6 +108,10 @@ class TestLearningSupervisor:
             await supervisor.shutdown()
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_supervisor_with_context(self):
         """Test supervisor with context."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -118,6 +130,10 @@ class TestLearningSupervisor:
             await supervisor.shutdown()
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_supervisor_learning_stats(self):
         """Test getting learning statistics."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -139,6 +155,10 @@ class TestNarrativeLearner:
     """Test the narrative learner with deepagents integration."""
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_narrative_learner_quick_context(self):
         """Test getting quick context."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -153,6 +173,10 @@ class TestNarrativeLearner:
             assert isinstance(context["recent_memories"], list)
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
+        reason="Requires valid API key",
+    )
     async def test_narrative_learner_background_processing(self):
         """Test background learning processing."""
         with tempfile.TemporaryDirectory() as tmpdir:
