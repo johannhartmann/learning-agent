@@ -78,10 +78,13 @@ asyncio.run(main())
 
 The Learning Agent includes a React-based web UI for visual interaction with the agent system.
 
-#### Quick Start with Docker (Recommended)
+#### Quick Start
 
 ```bash
 # Build and start all services (PostgreSQL, API server, LangGraph server, UI)
+docker compose up -d
+
+# Or use the Make command
 make docker-up
 
 # Access the services:
@@ -91,51 +94,36 @@ make docker-up
 # - PostgreSQL: localhost:5433
 ```
 
-#### Manual Setup
-
-1. **Start PostgreSQL with pgvector**:
-```bash
-docker run -d \
-  --name learning-agent-db \
-  -e POSTGRES_USER=learning_agent \
-  -e POSTGRES_PASSWORD=learning_agent_pass \
-  -e POSTGRES_DB=learning_memories \
-  -p 5433:5432 \
-  pgvector/pgvector:pg16
-```
-
-2. **Start the LangGraph Server**:
-```bash
-make server-dev  # Runs on port 2024
-```
-
-3. **Start the API Server** (in a new terminal):
-```bash
-make api-server  # Runs on port 8001
-```
-
-4. **Start the UI** (in another terminal):
-```bash
-make ui-dev  # Runs on port 10300
-```
-
-#### Docker Commands
+#### Docker Compose Commands
 
 ```bash
-# Build Docker images
-make docker-build
+# Start all services (PostgreSQL, API Server, LangGraph Server, UI)
+docker compose up -d
 
-# Start containers
-make docker-up
+# Start specific services
+docker compose up -d postgres  # Just database
+docker compose up -d server    # LangGraph + API server
+docker compose up -d ui        # Just UI
 
 # View logs
-make docker-logs
+docker compose logs -f        # All services
+docker compose logs -f postgres  # Specific service
 
-# Stop containers
-make docker-down
+# Stop services
+docker compose down
 
-# Clean up (including volumes)
-make docker-clean
+# Stop and remove volumes (caution: deletes data)
+docker compose down -v
+
+# Rebuild images
+docker compose build
+
+# Or use Make commands (wrapper around docker compose)
+make docker-build   # Build images
+make docker-up      # Start all services
+make docker-logs    # View logs
+make docker-down    # Stop services
+make docker-clean   # Clean up including volumes
 ```
 
 ### Using the DeepAgents API Directly
