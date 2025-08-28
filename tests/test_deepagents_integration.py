@@ -10,7 +10,6 @@ import pytest
 
 from learning_agent.agent import create_learning_agent
 from learning_agent.learning.narrative_learner import NarrativeLearner
-from learning_agent.learning_supervisor import LearningSupervisor
 from learning_agent.state import ExecutionData, LearningAgentState
 
 
@@ -80,75 +79,6 @@ class TestLearningAgent:
             assert result is not None
             assert "messages" in result
             assert len(result["messages"]) > 1  # Should have response
-
-
-class TestLearningSupervisor:
-    """Test the learning supervisor integration."""
-
-    @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
-        reason="Requires valid API key",
-    )
-    async def test_supervisor_simple_task(self):
-        """Test supervisor with a simple task."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            supervisor = LearningSupervisor(storage_path=Path(tmpdir))
-
-            # Process a simple task
-            result = await supervisor.process_task("Say hello")
-
-            assert result is not None
-            assert "status" in result
-            assert "duration" in result
-            assert "thread_id" in result
-            assert "learning_queued" in result
-
-            # Cleanup
-            await supervisor.shutdown()
-
-    @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
-        reason="Requires valid API key",
-    )
-    async def test_supervisor_with_context(self):
-        """Test supervisor with context."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            supervisor = LearningSupervisor(storage_path=Path(tmpdir))
-
-            # Process task with context
-            result = await supervisor.process_task(
-                "Count to 3", context="This is a test environment"
-            )
-
-            assert result is not None
-            assert result["task"] == "Count to 3"
-            assert "summary" in result
-
-            # Cleanup
-            await supervisor.shutdown()
-
-    @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        os.getenv("OPENAI_API_KEY", "").startswith("<") or not os.getenv("OPENAI_API_KEY"),
-        reason="Requires valid API key",
-    )
-    async def test_supervisor_learning_stats(self):
-        """Test getting learning statistics."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            supervisor = LearningSupervisor(storage_path=Path(tmpdir))
-
-            stats = await supervisor.get_learning_stats()
-
-            assert stats is not None
-            assert "memories_count" in stats
-            assert "patterns_count" in stats
-            assert "background_processor_active" in stats
-            assert "storage_path" in stats
-
-            # Cleanup
-            await supervisor.shutdown()
 
 
 class TestNarrativeLearner:

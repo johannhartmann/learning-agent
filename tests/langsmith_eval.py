@@ -12,7 +12,7 @@ from langsmith import Client
 from langsmith.evaluation import evaluate
 from langsmith.schemas import Example, Run
 
-from learning_agent.learning_supervisor import LearningSupervisor
+from learning_agent.agent import create_learning_agent
 
 
 # Initialize LangSmith client
@@ -194,16 +194,17 @@ async def consistency_evaluator(run: Run, example: Example) -> dict[str, float]:
 async def run_probabilistic_tests():
     """Run probabilistic tests using LangSmith evaluation."""
 
-    # Initialize supervisor
-    supervisor = LearningSupervisor()
-
     # Define the target function to test
     async def target_function(inputs: dict[str, Any]) -> dict[str, Any]:
         """Wrapper function for LangSmith evaluation."""
         task = inputs.get("task", "")
         context = inputs.get("context")
 
-        result = await supervisor.process_task(task, context)
+        agent = create_learning_agent()
+        state = {"messages": [{"role": "user", "content": task}]}
+        if context:
+            state["current_context"] = {"context": context}
+        result = await agent.ainvoke(state)
         return result
 
     # Run evaluations on each dataset
@@ -227,9 +228,6 @@ async def run_probabilistic_tests():
         )
 
         results[dataset_name] = eval_results
-
-    # Cleanup
-    await supervisor.shutdown()
 
     return results
 
@@ -331,14 +329,14 @@ async def ab_test_configurations():
     """Run A/B tests between different configurations."""
 
     # Configuration A: Default settings
-    supervisor_a = LearningSupervisor()
+    agent_a = create_learning_agent()
 
     # Configuration B: Modified settings (e.g., different LLM temperature)
     import learning_agent.config as config
 
     original_temp = config.settings.llm_temperature
     config.settings.llm_temperature = 0.3
-    supervisor_b = LearningSupervisor()
+    agent_b = create_learning_agent()
 
     # Test dataset
     test_inputs = [
@@ -352,11 +350,13 @@ async def ab_test_configurations():
 
     for input_data in test_inputs:
         # Run with config A
-        result_a = await supervisor_a.process_task(input_data["task"])
+        state_a = {"messages": [{"role": "user", "content": input_data["task"]}]}
+        result_a = await agent_a.ainvoke(state_a)
         results_a.append(result_a)
 
         # Run with config B
-        result_b = await supervisor_b.process_task(input_data["task"])
+        state_b = {"messages": [{"role": "user", "content": input_data["task"]}]}
+        result_b = await agent_b.ainvoke(state_b)
         results_b.append(result_b)
 
     # Compare results
@@ -371,8 +371,6 @@ async def ab_test_configurations():
 
     # Cleanup
     config.settings.llm_temperature = original_temp
-    await supervisor_a.shutdown()
-    await supervisor_b.shutdown()
 
     return comparison
 

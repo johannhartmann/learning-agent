@@ -52,24 +52,24 @@ cp .env.example .env
 
 ```python
 import asyncio
-from learning_agent.learning_supervisor import LearningSupervisor
+from learning_agent.agent import create_learning_agent
 
 async def main():
-    # Initialize the learning supervisor
-    supervisor = LearningSupervisor()
+    # Create the learning agent
+    agent = create_learning_agent()
 
     # Process a task - the agent will plan, execute, and learn
-    result = await supervisor.process_task(
-        "Create a Python function to calculate fibonacci numbers and test it"
-    )
+    state = {"messages": [{"role": "user", "content":
+        "Create a Python function to calculate fibonacci numbers and test it"}]}
+    result = await agent.ainvoke(state)
 
-    print(f"Task completed: {result['status']}")
-    print(f"Summary: {result['summary']}")
+    # Extract the last message as the summary
+    if result.get("messages"):
+        last_msg = result["messages"][-1]
+        print(f"Result: {last_msg.content if hasattr(last_msg, 'content') else last_msg}")
 
     # The agent has now learned from this experience
     # Future similar tasks will be executed more efficiently
-
-    await supervisor.shutdown()
 
 asyncio.run(main())
 ```

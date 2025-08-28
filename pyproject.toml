@@ -177,6 +177,7 @@ module = [
     "langmem.*",
     "langgraph.*",
     "langchain.*",
+    "langchain_core.*",
     "langchain_openai.*",
     "langchain_anthropic.*",
     "langchain_community.*",
@@ -188,7 +189,18 @@ module = [
     "langchain_groq.*",
     "langchain_together.*",
     "langchain_fireworks.*",
+    "langchain_voyageai.*",
     "learning_agent.ui.terminal",
+    "asyncpg",
+    "asyncpg.*",
+    "numpy",
+    "pgvector.*",
+    "fastapi",
+    "fastapi.*",
+    "uvicorn",
+    "typer",
+    "rich.*",
+    "dotenv",
 ]
 ignore_missing_imports = true
 
