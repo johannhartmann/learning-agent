@@ -62,7 +62,7 @@ jobs:
 
       - name: Run mypy
         run: |
-          uv run mypy src/learning_agent
+          uv run mypy --config-file pyproject.toml src/learning_agent
 
   security:
     name: Security Check
