@@ -4,18 +4,22 @@
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://img.shields.io/badge/mypy-checked-blue)](http://mypy-lang.org/)
 [![LangSmith](https://img.shields.io/badge/LangSmith-Enabled-green)](https://smith.langchain.com)
+[![CI](https://github.com/johannhartmann/learning-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/johannhartmann/learning-agent/actions/workflows/ci.yml)
 
 A sophisticated autonomous agent system that learns from experience, orchestrates parallel task execution, and adapts its behavior based on past successes and failures.
 
 ## ✨ Features
 
 - **🎭 DeepAgents Framework**: Built on [deepagents](https://github.com/langchain-ai/deepagents) for sophisticated agent orchestration
-- **🔄 Autonomous Learning**: Learns from every task execution using langmem and narrative memories
-- **⚡ Parallel Sub-Agents**: Multiple specialized sub-agents working in parallel via deepagents' task tool
+- **🐘 PostgreSQL Vector Storage**: Production-ready vector database with pgvector for semantic memory search
+- **🔄 Multi-Dimensional Learning**: Captures tactical, strategic, and meta-level insights from every execution
+- **⚡ Parallel Sub-Agents**: Four specialized sub-agents (learning-query, execution-specialist, reflection-analyst, planning-strategist)
+- **🌐 REST API Server**: FastAPI endpoints for memory retrieval and pattern analysis (port 8001)
 - **📝 Narrative Memory**: Creates human-readable narratives of experiences with deep reflection
-- **🔍 Pattern Recognition**: Automatically identifies and applies successful patterns to new tasks
+- **🔍 Execution Analysis**: Automatic detection of inefficiencies, redundancies, and optimization opportunities
 - **🗂️ Virtual File System**: Safe file operations through deepagents' virtual filesystem
 - **📊 LangSmith Integration**: Complete observability of agent execution and learning processes
+- **🖥️ Web UI**: React-based interface for visual interaction with the agent (port 10300)
 
 ## 🚀 Quick Start
 
@@ -70,33 +74,50 @@ async def main():
 asyncio.run(main())
 ```
 
-### 🖥️ Web UI (New!)
+### 🖥️ Web UI
 
-The Learning Agent now includes a web-based UI powered by deep-agents-ui. This provides a visual interface for interacting with the agent.
+The Learning Agent includes a React-based web UI for visual interaction with the agent system.
 
-#### Quick Start with Docker
+#### Quick Start with Docker (Recommended)
 
 ```bash
-# Build and start both server and UI
+# Build and start all services (PostgreSQL, API server, LangGraph server, UI)
 make docker-up
 
-# Access the UI at http://localhost:10300
-# The LangGraph server runs at http://localhost:2024
+# Access the services:
+# - Web UI: http://localhost:10300
+# - LangGraph Server: http://localhost:2024
+# - API Server: http://localhost:8001
+# - PostgreSQL: localhost:5433
 ```
 
 #### Manual Setup
 
-1. **Start the LangGraph Server**:
+1. **Start PostgreSQL with pgvector**:
 ```bash
-make server-dev
+docker run -d \
+  --name learning-agent-db \
+  -e POSTGRES_USER=learning_agent \
+  -e POSTGRES_PASSWORD=learning_agent_pass \
+  -e POSTGRES_DB=learning_memories \
+  -p 5433:5432 \
+  pgvector/pgvector:pg16
 ```
 
-2. **Start the UI** (in a new terminal):
+2. **Start the LangGraph Server**:
 ```bash
-make ui-dev
+make server-dev  # Runs on port 2024
 ```
 
-3. **Access the UI** at http://localhost:3000 (or configured port)
+3. **Start the API Server** (in a new terminal):
+```bash
+make api-server  # Runs on port 8001
+```
+
+4. **Start the UI** (in another terminal):
+```bash
+make ui-dev  # Runs on port 10300
+```
 
 #### Docker Commands
 
@@ -142,67 +163,104 @@ result = await agent.ainvoke(initial_state)
 
 ## 🏗️ Architecture
 
-The Learning Agent combines DeepAgents framework with narrative learning and now includes a web UI:
+The Learning Agent combines DeepAgents framework with PostgreSQL vector storage, API server, and web UI:
 
 ```mermaid
 graph TD
-    UI[Web UI - deep-agents-ui] -->|HTTP/WebSocket| Server[LangGraph Server]
-    CLI[CLI Interface] --> A[LearningSupervisor]
+    UI[React Web UI] -->|HTTP| API[FastAPI Server :8001]
+    UI -->|WebSocket| Server[LangGraph Server :2024]
 
-    Server --> A
-    A -->|Wraps| B[DeepAgents Agent]
-    B --> C[Built-in Planning Tool]
-    B --> D[Task Tool for Sub-Agents]
-    B --> E[Virtual File System]
-    B --> F[Learning Tools]
+    CLI[CLI Interface] --> LS[LearningSupervisor]
+    Server --> LS
 
-    D -->|Delegates to| G[Specialized Sub-Agents]
-    G --> H[learning-query]
-    G --> I[execution-specialist]
-    G --> J[reflection-analyst]
-    G --> K[planning-strategist]
+    LS -->|Orchestrates| Agent[DeepAgents Agent]
+    Agent --> Tools[Core Tools]
+    Agent --> SubAgents[Sub-Agents via Task Tool]
 
-    A -->|Background| L[Narrative Learner]
-    L --> M[LangMem Processing]
-    L --> N[FAISS Vector Store]
-    L --> O[Pattern Extraction]
+    Tools --> PT[Planning Tool - write_todos]
+    Tools --> FS[File System - read/write/edit]
+    Tools --> LT[Learning Tools]
 
-    F -->|Interacts with| L
+    SubAgents --> LQ[learning-query]
+    SubAgents --> ES[execution-specialist]
+    SubAgents --> RA[reflection-analyst]
+    SubAgents --> PS[planning-strategist]
+
+    LS -->|Background Processing| NL[NarrativeLearner]
+    NL -->|Stores| PG[(PostgreSQL + pgvector :5433)]
+
+    API -->|Queries| PG
+    LT -->|Search| PG
+
+    PG -->|Stores| Memories[Multi-Dimensional Memories]
+    PG -->|Stores| Patterns[Execution Patterns]
+    PG -->|Stores| Embeddings[Vector Embeddings]
 ```
 
 ### Core Components
 
-- **Web UI**: Next.js-based interface for visual interaction with the agent
-- **LangGraph Server**: Serves the agent as an API endpoint for the UI
-- **LearningSupervisor**: Integrates deepagents with background learning system
-- **DeepAgents Agent**: Core agent built with `create_deep_agent()` providing planning and sub-agent orchestration
-- **Specialized Sub-Agents**: Four specialized agents for different aspects of task execution
-- **Narrative Learner**: Creates and maintains episodic memories using langmem
-- **Learning Tools**: Custom tools for memory search, pattern application, and learning queue
-- **Virtual File System**: DeepAgents' safe file operations for parallel execution
+- **React Web UI** (Port 10300): TypeScript-based interface for visual interaction
+- **FastAPI Server** (Port 8001): REST API for memory retrieval and pattern analysis
+- **LangGraph Server** (Port 2024): Serves the agent as an API endpoint
+- **PostgreSQL + pgvector** (Port 5433): Production-ready vector database for semantic search
+- **LearningSupervisor**: Orchestrates deepagents agent with background learning
+- **DeepAgents Agent**: Core agent built with `create_deep_agent()`
+- **NarrativeLearner**: Processes conversations into multi-dimensional learnings
+- **Specialized Sub-Agents**: Four agents for different execution aspects
+- **Learning Tools**: Memory search, pattern application, and learning queue management
 
-## 🧪 Testing Strategy
+## 🌐 API Server
 
-This project uses a hybrid testing approach combining traditional unit tests with LangSmith-based probabilistic testing:
+The FastAPI server provides REST endpoints for accessing memories and patterns:
+
+### Endpoints
+
+- `GET /memories` - Retrieve stored memories with optional search
+- `GET /patterns` - Get identified patterns with confidence scores
+- `GET /learning-queue` - View items queued for learning
+- `GET /execution-stats` - Get execution efficiency metrics
+
+### Example Usage
+
+```bash
+# Get recent memories
+curl http://localhost:8001/memories?limit=10
+
+# Search memories by content
+curl http://localhost:8001/memories?search=fibonacci
+
+# Get high-confidence patterns
+curl http://localhost:8001/patterns?min_confidence=0.8
+```
+
+## 🧪 Testing
+
+The project includes comprehensive test coverage with CI/CD integration:
 
 ```bash
 # Run all tests
-make test-all
+make test
 
-# Traditional unit tests
-make test-unit
+# Run specific test categories
+make test-unit          # Unit tests
+make test-integration   # Integration tests
 
-# Integration tests
-make test-integration
+# Run with coverage
+make test-coverage
 
-# LangSmith probabilistic tests
-make langsmith-test
+# Type checking
+make typecheck
 
-# Generate regression tests from production
-make langsmith-regression
+# Linting
+make lint
 ```
 
-See [tests/README.md](tests/README.md) for detailed testing philosophy.
+### CI/CD Pipeline
+- **GitHub Actions**: Automated testing on every push
+- **Test Matrix**: Python 3.11 and 3.12
+- **Quality Checks**: Linting, type checking, security scanning
+- **Coverage**: Unit tests with pytest-cov
+- **API Key Safety**: Tests skip when API keys unavailable
 
 ## 📊 Observability
 
@@ -274,6 +332,27 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 - [Testing Strategy](tests/README.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
 
+## 🐘 PostgreSQL Vector Storage
+
+The Learning Agent uses PostgreSQL with pgvector extension for production-ready vector storage:
+
+### Features
+- **Multi-Dimensional Learning Storage**: Stores tactical, strategic, and meta-level insights
+- **Semantic Search**: Vector similarity search for finding relevant past experiences
+- **Execution Pattern Analysis**: Tracks tool usage, efficiency scores, and anti-patterns
+- **Scalable**: Production-ready database that can handle millions of memories
+
+### Database Schema
+- **Memories Table**: Stores conversation memories with embeddings
+- **Patterns Table**: Stores identified patterns and their confidence scores
+- **Learning Queue**: Tracks items queued for explicit learning
+- **Execution Metadata**: Stores tool sequences, timings, and efficiency metrics
+
+### Connection
+```env
+DATABASE_URL=postgresql://learning_agent:learning_agent_pass@localhost:5433/learning_memories
+```
+
 ## 🔧 Configuration
 
 The agent is highly configurable through environment variables:
@@ -284,6 +363,14 @@ LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 LLM_TEMPERATURE=0.7
 
+# API Keys
+OPENAI_API_KEY=your_api_key
+ANTHROPIC_API_KEY=your_api_key  # Optional
+LANGSMITH_API_KEY=your_api_key
+
+# Database Configuration
+DATABASE_URL=postgresql://learning_agent:learning_agent_pass@localhost:5433/learning_memories
+
 # Learning Configuration
 ENABLE_LEARNING=true
 LEARNING_CONFIDENCE_THRESHOLD=0.9
@@ -292,19 +379,33 @@ PATTERN_RETENTION_DAYS=90
 # Performance
 MAX_PARALLEL_AGENTS=10
 TASK_TIMEOUT_SECONDS=300
+
+# Embedding Configuration
+EMBEDDING_PROVIDER=openai
+EMBEDDING_MODEL=text-embedding-3-small
 ```
 
 See [.env.example](.env.example) for all options.
 
 ## 🚦 Project Status
 
-This project is in active development. Current focus areas:
+This project is in active development.
 
-- [ ] Implement long-term memory consolidation
-- [ ] Add support for additional LLM providers
-- [ ] Enhance pattern recognition algorithms
-- [ ] Implement collaborative multi-agent learning
-- [ ] Add web UI for monitoring
+### ✅ Completed Features
+- [x] PostgreSQL vector storage with pgvector
+- [x] Multi-dimensional learning extraction (tactical, strategic, meta)
+- [x] Web UI with React/TypeScript
+- [x] REST API for memory access
+- [x] Execution pattern analysis
+- [x] Support for multiple LLM providers (OpenAI, Anthropic, Ollama, etc.)
+- [x] CI/CD pipeline with GitHub Actions
+
+### 🚧 In Progress
+- [ ] Long-term memory consolidation
+- [ ] Advanced pattern recognition algorithms
+- [ ] Collaborative multi-agent learning
+- [ ] Memory pruning and optimization
+- [ ] Real-time learning dashboard
 
 ## 📝 License
 
