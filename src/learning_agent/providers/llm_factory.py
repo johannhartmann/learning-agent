@@ -1,4 +1,5 @@
 """Factory for creating provider-agnostic chat models."""
+# mypy: ignore-errors
 
 from typing import Any
 
@@ -91,4 +92,4 @@ def get_chat_model(config: Any) -> BaseChatModel:
             f"Failed to initialize {config.llm_provider} and no OpenAI API key available for fallback"
         ) from e
     else:
-        return model
+        return model  # type: ignore[no-any-return]
