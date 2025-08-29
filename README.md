@@ -14,6 +14,8 @@ A sophisticated autonomous agent system that learns from experience, orchestrate
 - **🐘 PostgreSQL Vector Storage**: Production-ready vector database with pgvector for semantic memory search
 - **🔄 Multi-Dimensional Learning**: Captures tactical, strategic, and meta-level insights from every execution
 - **⚡ Parallel Sub-Agents**: Four specialized sub-agents (learning-query, execution-specialist, reflection-analyst, planning-strategist)
+- **🐍 Python Sandbox**: Secure code execution with Pyodide WebAssembly environment
+- **📊 Visualization Support**: Automatic capture of matplotlib plots, PIL images, and pandas DataFrames
 - **🌐 REST API Server**: FastAPI endpoints for memory retrieval and pattern analysis (port 8001)
 - **📝 Narrative Memory**: Creates human-readable narratives of experiences with deep reflection
 - **🔍 Execution Analysis**: Automatic detection of inefficiencies, redundancies, and optimization opportunities
@@ -149,6 +151,31 @@ initial_state: LearningAgentState = {
 result = await agent.ainvoke(initial_state)
 ```
 
+### 🐍 Python Sandbox
+
+The agent includes a secure Python sandbox powered by Pyodide (Python compiled to WebAssembly) for safe code execution:
+
+```python
+# The agent can execute Python code safely
+state = {"messages": [{"role": "user", "content":
+    "Analyze this data and create a visualization: [1,2,3,4,5]"}]}
+result = await agent.ainvoke(state)
+
+# The sandbox supports:
+# - Data analysis with pandas, numpy, scipy
+# - Matplotlib visualizations (captured as base64 images)
+# - PIL/Pillow image processing
+# - Stateful execution (variables persist between calls)
+# - Package installation from PyPI (with allow_network=True)
+```
+
+**Sandbox Features:**
+- **Isolated Execution**: Runs in WebAssembly environment, isolated from host system
+- **Visualization Capture**: Automatically captures matplotlib plots and PIL images as base64
+- **Data Analysis**: Pre-loaded with pandas, numpy, and scientific computing libraries
+- **Stateful Sessions**: Variables and imports persist across multiple executions
+- **Safe Testing**: Test algorithms and logic before writing to files
+
 ## 🏗️ Architecture
 
 The Learning Agent combines DeepAgents framework with PostgreSQL vector storage, API server, and web UI:
@@ -167,6 +194,7 @@ graph TD
     Tools --> PT[Planning Tool - write_todos]
     Tools --> FS[File System - read/write/edit]
     Tools --> LT[Learning Tools]
+    Tools --> PS[Python Sandbox - code execution]
 
     SubAgents --> LQ[learning-query]
     SubAgents --> ES[execution-specialist]
@@ -191,6 +219,7 @@ graph TD
 - **LangGraph Server** (Port 2024): Serves the agent as an API endpoint
 - **PostgreSQL + pgvector** (Port 5433): Production-ready vector database for semantic search
 - **DeepAgents Agent**: Core agent built with `create_deep_agent()` that directly integrates learning
+- **Python Sandbox**: Pyodide-based WebAssembly environment for safe code execution with visualization support
 - **NarrativeLearner**: Background processor that converts conversations into multi-dimensional learnings
 - **Specialized Sub-Agents**: Four agents for different execution aspects
 - **Learning Tools**: Memory search, pattern application, and learning queue management
@@ -382,6 +411,8 @@ This project is in active development.
 - [x] Multi-dimensional learning extraction (tactical, strategic, meta)
 - [x] Web UI with React/TypeScript
 - [x] REST API for memory access
+- [x] Python sandbox with Pyodide for safe code execution
+- [x] Automatic visualization capture (matplotlib, PIL, pandas)
 - [x] Execution pattern analysis
 - [x] Support for multiple LLM providers (OpenAI, Anthropic, Ollama, etc.)
 - [x] CI/CD pipeline with GitHub Actions

@@ -10,6 +10,7 @@ from learning_agent.learning.tools import create_learning_tools
 from learning_agent.providers import get_chat_model
 from learning_agent.state import LearningAgentState
 from learning_agent.subagents import LEARNING_SUBAGENTS
+from learning_agent.tools.sandbox_tool import create_sandbox_tool
 
 
 # Main system prompt for the learning agent
@@ -33,9 +34,14 @@ You are an autonomous agent that learns from every task execution to become more
    - Returns meta-learnings (insights about the learning process)
    - Returns anti-patterns (what NOT to do)
    - Shows execution efficiency scores and confidence levels
-2. **Task Orchestration**: Use sub-agents via the `task` tool for specialized work
-3. **Learning Queue**: Queue experiences for explicit learning with `queue_learning` (most learning is automatic)
-4. **Planning**: Use `write_todos` to create detailed execution plans
+2. **Python Sandbox**: Execute Python code safely using `python_sandbox`
+   - Run data analysis, algorithms, and calculations in isolated environment
+   - Automatically captures matplotlib plots and PIL images as base64
+   - Maintains state across executions (imports, variables persist)
+   - Perfect for testing code before writing to files
+3. **Task Orchestration**: Use sub-agents via the `task` tool for specialized work
+4. **Learning Queue**: Queue experiences for explicit learning with `queue_learning` (most learning is automatic)
+5. **Planning**: Use `write_todos` to create detailed execution plans
 
 ## Your Sub-Agents
 You can delegate work to specialized sub-agents using the `task` tool:
@@ -90,6 +96,17 @@ You have access to standard file operations:
 - Use parallel execution when tasks are independent
 - The todo list helps you track progress but YOU must do the actual work
 
+## Python Sandbox Usage
+Use `python_sandbox` for:
+- Testing algorithms and logic before implementing in files
+- Data analysis and visualization (matplotlib, pandas, numpy)
+- Quick calculations and prototyping
+- Generating plots to explain concepts or show results
+- Image processing with PIL/Pillow
+- Running user-provided code snippets safely
+
+The sandbox maintains state, so you can build up complex analysis step by step.
+
 ## EXAMPLE WORKFLOW
 When asked to "Create a Snake game":
 1. Use `write_todos` to plan: [Create HTML, Create CSS, Create JavaScript, Test game]
@@ -97,6 +114,11 @@ When asked to "Create a Snake game":
 3. Execute it: `write_file` to create index.html with the actual HTML code
 4. Mark completed: `write_todos` with first item status="completed"
 5. Repeat for each todo item until all are completed
+
+When asked to "Analyze this data and create a visualization":
+1. Use `python_sandbox` to load and explore the data
+2. Use `python_sandbox` again to create matplotlib visualizations
+3. Based on analysis results, write findings to a file if needed
 
 Remember: Your goal is not just to complete tasks, but to learn from each execution to become more capable over time. Every task is an opportunity to extract patterns and insights for future use.
 
@@ -139,9 +161,13 @@ def create_learning_agent(
     # Create learning tools
     learning_tools = create_learning_tools()
 
+    # Create sandbox tool
+    sandbox_tool = create_sandbox_tool()
+
     # Combine with deepagents built-in tools
     all_tools = [
         *learning_tools,  # Learning-specific tools
+        sandbox_tool,  # Python sandbox for safe code execution
         write_todos,  # Planning and task tracking
         ls,  # List directory contents
         read_file,  # Read file contents
