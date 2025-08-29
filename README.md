@@ -158,10 +158,9 @@ graph TD
     UI[React Web UI] -->|HTTP| API[FastAPI Server :8001]
     UI -->|WebSocket| Server[LangGraph Server :2024]
 
-    CLI[CLI Interface] --> LS[LearningSupervisor]
-    Server --> LS
+    CLI[CLI Interface] --> Agent[DeepAgents Agent]
+    Server --> Agent
 
-    LS -->|Orchestrates| Agent[DeepAgents Agent]
     Agent --> Tools[Core Tools]
     Agent --> SubAgents[Sub-Agents via Task Tool]
 
@@ -174,7 +173,7 @@ graph TD
     SubAgents --> RA[reflection-analyst]
     SubAgents --> PS[planning-strategist]
 
-    LS -->|Background Processing| NL[NarrativeLearner]
+    Agent -->|Background Learning| NL[NarrativeLearner]
     NL -->|Stores| PG[(PostgreSQL + pgvector :5433)]
 
     API -->|Queries| PG
@@ -191,9 +190,8 @@ graph TD
 - **FastAPI Server** (Port 8001): REST API for memory retrieval and pattern analysis
 - **LangGraph Server** (Port 2024): Serves the agent as an API endpoint
 - **PostgreSQL + pgvector** (Port 5433): Production-ready vector database for semantic search
-- **LearningSupervisor**: Orchestrates deepagents agent with background learning
-- **DeepAgents Agent**: Core agent built with `create_deep_agent()`
-- **NarrativeLearner**: Processes conversations into multi-dimensional learnings
+- **DeepAgents Agent**: Core agent built with `create_deep_agent()` that directly integrates learning
+- **NarrativeLearner**: Background processor that converts conversations into multi-dimensional learnings
 - **Specialized Sub-Agents**: Four agents for different execution aspects
 - **Learning Tools**: Memory search, pattern application, and learning queue management
 
