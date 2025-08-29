@@ -5,7 +5,7 @@ from typing import Annotated, Any
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import InjectedToolCallId, tool
-from langchain_sandbox import PyodideSandboxTool  # type: ignore[import-not-found]
+from langchain_sandbox import PyodideSandboxTool  # type: ignore[import]
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
@@ -21,7 +21,7 @@ class EnhancedSandbox:
         Args:
             allow_network: Whether to allow network access for package installation
         """
-        self.sandbox = PyodideSandboxTool(stateful=True, allow_network=allow_network)
+        self.sandbox = PyodideSandboxTool(stateful=True, allow_net=allow_network)
         self.session_state = None
 
     async def execute_with_viz(self, code: str) -> dict[str, Any]:
@@ -187,7 +187,7 @@ print(json.dumps(_result))
 
     async def reset(self) -> None:
         """Reset the sandbox state."""
-        self.sandbox = PyodideSandboxTool(stateful=True)
+        self.sandbox = PyodideSandboxTool(stateful=True, allow_net=False)
         self.session_state = None
 
 

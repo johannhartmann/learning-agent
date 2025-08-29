@@ -191,3 +191,43 @@ class TestLearningState:
         assert exec_data.task == "Test task"
         assert exec_data.outcome == "failure"
         assert exec_data.error == "Test error"
+
+
+class TestSandboxIntegration:
+    """Integration tests for the Python sandbox tool."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("SKIP_SANDBOX_TESTS", "true").lower() == "true",
+        reason="Sandbox tests require Deno runtime",
+    )
+    async def test_sandbox_tool_in_agent(self, temp_storage):
+        """Test that sandbox tool is properly integrated in the agent."""
+        # Create agent with sandbox tool
+        agent = create_learning_agent(storage_path=temp_storage)
+
+        # Check that sandbox tool is in the agent's tools
+        tool_names = [tool.name for tool in agent.tools]
+        assert "python_sandbox" in tool_names
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.getenv("SKIP_SANDBOX_TESTS", "true").lower() == "true",
+        reason="Sandbox tests require Deno runtime",
+    )
+    async def test_agent_can_use_sandbox(self, temp_storage):
+        """Test that the agent can execute code in the sandbox."""
+        agent = create_learning_agent(storage_path=temp_storage)
+
+        # For integration testing, we verify the sandbox tool is available
+        # Full execution would require LLM API calls
+        sandbox_tool = None
+        for tool in agent.tools:
+            if tool.name == "python_sandbox":
+                sandbox_tool = tool
+                break
+
+        assert sandbox_tool is not None
+        assert sandbox_tool.description is not None
+        assert "Python code" in sandbox_tool.description
+        assert "sandbox" in sandbox_tool.description.lower()
