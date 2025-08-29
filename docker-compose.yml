@@ -39,6 +39,7 @@ services:
       - LLM_PROVIDER=${LLM_PROVIDER:-openai}
       - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
       - DATABASE_URL=postgresql://learning_agent:learning_agent_pass@postgres:5432/learning_memories
+      - BG_JOB_ISOLATED_LOOPS=true
     volumes:
       - ./src:/app/src:ro
       - ./.agent:/app/.agent

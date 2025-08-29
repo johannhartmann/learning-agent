@@ -191,6 +191,7 @@ module = [
     "langchain_together.*",
     "langchain_fireworks.*",
     "langchain_voyageai.*",
+    "langchain_sandbox.*",
     "learning_agent.ui.terminal",
     "asyncpg",
     "asyncpg.*",
