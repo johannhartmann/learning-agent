@@ -247,24 +247,53 @@ async def python_sandbox(
 ) -> Command[Any]:
     """Execute Python code in a secure sandbox with visualization support.
 
+    IMPORTANT: You MUST use print() to see any output! The sandbox only returns what is
+    explicitly printed. Simply returning a value or having an expression as the last line
+    will NOT produce output.
+
     This tool runs Python code in an isolated WebAssembly environment using Pyodide.
     It maintains state across executions and can capture matplotlib plots, PIL images,
     and pandas DataFrames.
 
     Args:
-        code: Python code to execute. Can include imports, function definitions,
-              data analysis, plotting, etc. State is maintained between calls.
+        code: Python code to execute. ALWAYS use print() to display results!
+              State is maintained between calls unless reset_state=True.
         reset_state: If True, reset the sandbox to a clean state before execution
 
     Returns:
         Execution results including stdout, generated images, and data tables
 
-    Examples:
+    Examples of CORRECT usage:
+        # ✅ CORRECT - uses print()
+        result = fibonacci(10)
+        print(result)
+
+        # ✅ CORRECT - prints the output
+        print(f"The answer is: {2 + 2}")
+
+        # ✅ CORRECT - multiple prints
+        for i in range(5):
+            print(f"Square of {i} is {i**2}")
+
+    Examples of INCORRECT usage:
+        # ❌ WRONG - no output will be shown
+        fibonacci(10)
+
+        # ❌ WRONG - return values don't show
+        def calculate():
+            return 42
+        calculate()
+
+        # ❌ WRONG - last expression doesn't auto-print
+        result = [1, 2, 3]
+        result
+
+    Common tasks:
         - Data analysis: Load data, compute statistics, create visualizations
         - Algorithm testing: Test functions before writing to files
         - Quick calculations: Mathematical computations, data transformations
-        - Plotting: Generate matplotlib charts, histograms, heatmaps
-        - Image processing: Use PIL/Pillow for image manipulation
+        - Plotting: Generate matplotlib charts (use plt.show())
+        - Always remember: print() your results!
     """
     sandbox = await get_sandbox()
 
