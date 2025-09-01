@@ -1,15 +1,11 @@
 """Enhanced Python sandbox tool with visualization support."""
 
-import json
 from typing import Annotated, Any
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import InjectedToolCallId, tool
 from langchain_sandbox.pyodide import PyodideSandbox
-from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
-
-from learning_agent.state import LearningAgentState
 
 
 class EnhancedSandbox:
@@ -33,30 +29,58 @@ class EnhancedSandbox:
         Returns:
             Dictionary with stdout, stderr, images, tables, and execution metadata
         """
-        # For now, execute code directly without the wrapper
-        # The wrapper causes issues with the sandbox execution
+        # Wrap code to capture visualizations
+        wrapped_code = self._wrap_code_for_viz(code)
+
         try:
-            # Use execute method from PyodideSandbox
-            # This is already async, so we can await it directly
-            result = await self.sandbox.execute(code)
+            # Execute wrapped code to capture outputs
+            result = await self.sandbox.execute(wrapped_code)
+
+            # Try to parse JSON output from wrapper
+            if result.status == "success" and result.stdout:
+                try:
+                    # The wrapper outputs JSON with captured data
+                    import json
+
+                    output_data = json.loads(result.stdout)
+                    return {
+                        "success": True,
+                        "code": code,
+                        "stdout": output_data.get("stdout", ""),
+                        "stderr": "",
+                        "images": output_data.get("outputs", {}).get("images", []),
+                        "tables": output_data.get("outputs", {}).get("tables", []),
+                        "data": output_data.get("outputs", {}).get("data", {}),
+                    }
+                except (json.JSONDecodeError, KeyError):
+                    # Fallback to direct execution without viz capture
+                    result = await self.sandbox.execute(code)
+                    return {
+                        "success": result.status == "success",
+                        "code": code,
+                        "stdout": result.stdout or "",
+                        "stderr": result.stderr or "",
+                        "images": [],
+                        "tables": [],
+                        "data": {},
+                    }
+            else:
+                # Direct execution if initial execution failed
+                return {
+                    "success": result.status == "success",
+                    "code": code,
+                    "stdout": result.stdout or "",
+                    "stderr": result.stderr or "",
+                    "images": [],
+                    "tables": [],
+                    "data": {},
+                }
         except Exception as e:
-            error_msg = str(e)
             return {
                 "success": False,
                 "code": code,
                 "stdout": "",
-                "stderr": error_msg,
-                "images": [],
-                "tables": [],
-                "data": {},
-            }
-        else:
-            # Parse the result
-            return {
-                "success": result.status == "success",
-                "code": code,
-                "stdout": result.stdout or "",
-                "stderr": result.stderr or "",
+                "stderr": str(e),
                 "images": [],
                 "tables": [],
                 "data": {},
@@ -171,40 +195,6 @@ print(json.dumps(_result))
         escaped_code = code.replace("\\", "\\\\").replace('"""', '\\"\\"\\"')
         return wrapper.replace("{code}", escaped_code)
 
-    def _parse_outputs(self, result: str, original_code: str) -> dict[str, Any]:
-        """Parse the execution result into structured format.
-
-        Args:
-            result: Raw execution result from sandbox
-            original_code: Original code for reference
-
-        Returns:
-            Structured output dictionary
-        """
-        try:
-            # Try to parse as JSON (from our wrapper)
-            parsed = json.loads(result)
-            return {
-                "success": True,
-                "code": original_code,
-                "stdout": parsed.get("stdout", ""),
-                "stderr": "",
-                "images": parsed.get("outputs", {}).get("images", []),
-                "tables": parsed.get("outputs", {}).get("tables", []),
-                "data": parsed.get("outputs", {}).get("data", {}),
-            }
-        except (json.JSONDecodeError, TypeError):
-            # Fallback for direct output
-            return {
-                "success": True,
-                "code": original_code,
-                "stdout": str(result),
-                "stderr": "",
-                "images": [],
-                "tables": [],
-                "data": {},
-            }
-
     async def reset(self) -> None:
         """Reset the sandbox state."""
         import asyncio
@@ -241,59 +231,30 @@ async def get_sandbox() -> EnhancedSandbox:
 @tool
 async def python_sandbox(
     code: str,
-    state: Annotated[LearningAgentState, InjectedState],  # noqa: ARG001
     tool_call_id: Annotated[str, InjectedToolCallId],
     reset_state: bool = False,
 ) -> Command[Any]:
-    """Execute Python code in a secure sandbox with visualization support.
+    """Execute Python code in a secure sandbox environment.
 
-    IMPORTANT: You MUST use print() to see any output! The sandbox only returns what is
-    explicitly printed. Simply returning a value or having an expression as the last line
-    will NOT produce output.
-
-    This tool runs Python code in an isolated WebAssembly environment using Pyodide.
-    It maintains state across executions and can capture matplotlib plots, PIL images,
-    and pandas DataFrames.
+    CRITICAL: You MUST use print() to display output! The sandbox only shows what you print.
 
     Args:
-        code: Python code to execute. ALWAYS use print() to display results!
-              State is maintained between calls unless reset_state=True.
-        reset_state: If True, reset the sandbox to a clean state before execution
+        code: Python code to execute. Always use print() to show results.
+        reset_state: If True, reset sandbox to clean state (default: False)
 
-    Returns:
-        Execution results including stdout, generated images, and data tables
+    Examples:
+        # Calculate factorial
+        def factorial(n):
+            if n <= 1:
+                return 1
+            return n * factorial(n - 1)
 
-    Examples of CORRECT usage:
-        # ✅ CORRECT - uses print()
-        result = fibonacci(10)
-        print(result)
+        print(f"Factorial of 5: {factorial(5)}")
 
-        # ✅ CORRECT - prints the output
-        print(f"The answer is: {2 + 2}")
-
-        # ✅ CORRECT - multiple prints
-        for i in range(5):
-            print(f"Square of {i} is {i**2}")
-
-    Examples of INCORRECT usage:
-        # ❌ WRONG - no output will be shown
-        fibonacci(10)
-
-        # ❌ WRONG - return values don't show
-        def calculate():
-            return 42
-        calculate()
-
-        # ❌ WRONG - last expression doesn't auto-print
-        result = [1, 2, 3]
-        result
-
-    Common tasks:
-        - Data analysis: Load data, compute statistics, create visualizations
-        - Algorithm testing: Test functions before writing to files
-        - Quick calculations: Mathematical computations, data transformations
-        - Plotting: Generate matplotlib charts (use plt.show())
-        - Always remember: print() your results!
+        # String manipulation
+        text = "hello world"
+        print(f"Uppercase: {text.upper()}")
+        print(f"Word count: {len(text.split())}")
     """
     sandbox = await get_sandbox()
 
