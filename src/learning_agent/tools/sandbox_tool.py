@@ -29,10 +29,41 @@ class EnhancedSandbox:
         Returns:
             Dictionary with stdout, stderr, images, tables, and execution metadata
         """
-        # For now, skip the wrapper and execute directly
-        # The wrapper is causing issues with matplotlib import
+        # Check if code uses matplotlib and needs special handling
+        uses_matplotlib = "matplotlib" in code or "plt" in code
+
+        if uses_matplotlib:
+            # Prepend matplotlib backend setup for Pyodide
+            setup_code = """
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+import io
+import base64
+
+# Store original show function
+_original_show = plt.show
+
+# Override show to capture the figure
+def _capture_show():
+    import io
+    import base64
+    fig = plt.gcf()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    buf.seek(0)
+    img_str = base64.b64encode(buf.read()).decode('utf-8')
+    print(f"__MATPLOTLIB_FIGURE__:{img_str}:__END_FIGURE__")
+    plt.close(fig)
+
+plt.show = _capture_show
+"""
+            full_code = setup_code + "\n" + code
+        else:
+            full_code = code
+
         try:
-            result = await self.sandbox.execute(code)
+            result = await self.sandbox.execute(full_code)
         except Exception as e:
             return {
                 "success": False,
@@ -43,16 +74,37 @@ class EnhancedSandbox:
                 "tables": [],
                 "data": {},
             }
-        else:
-            return {
-                "success": result.status == "success",
-                "code": code,
-                "stdout": result.stdout or "",
-                "stderr": result.stderr or "",
-                "images": [],
-                "tables": [],
-                "data": {},
-            }
+
+        # Parse output for matplotlib figures
+        images: list[dict[str, Any]] = []
+        stdout = result.stdout or ""
+
+        if uses_matplotlib and "__MATPLOTLIB_FIGURE__:" in stdout:
+            # Extract base64 images from stdout
+            import re
+
+            pattern = r"__MATPLOTLIB_FIGURE__:([^:]+):__END_FIGURE__"
+            matches = re.findall(pattern, stdout)
+            images.extend(
+                {
+                    "type": "matplotlib",
+                    "format": "png",
+                    "base64": match,
+                }
+                for match in matches
+            )
+            # Clean stdout by removing the figure markers
+            stdout = re.sub(pattern, "", stdout).strip()
+
+        return {
+            "success": result.status == "success",
+            "code": code,
+            "stdout": stdout,
+            "stderr": result.stderr or "",
+            "images": images,
+            "tables": [],
+            "data": {},
+        }
 
     def _wrap_code_for_viz(self, code: str) -> str:
         """Wrap user code to capture matplotlib figures and data outputs.
@@ -266,13 +318,10 @@ async def python_sandbox(
             else "Code executed successfully (no output)"
         )
 
-        # Store visualization data in state for potential UI rendering
-        # This could be used by the UI to display images inline
+        # Return the response message
         return Command(
             update={
                 "messages": [ToolMessage(response, tool_call_id=tool_call_id)],
-                # Store viz data in state if needed for UI
-                "current_context": {"sandbox_outputs": result},
             }
         )
 
