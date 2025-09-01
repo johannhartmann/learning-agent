@@ -29,58 +29,26 @@ class EnhancedSandbox:
         Returns:
             Dictionary with stdout, stderr, images, tables, and execution metadata
         """
-        # Wrap code to capture visualizations
-        wrapped_code = self._wrap_code_for_viz(code)
-
+        # For now, skip the wrapper and execute directly
+        # The wrapper is causing issues with matplotlib import
         try:
-            # Execute wrapped code to capture outputs
-            result = await self.sandbox.execute(wrapped_code)
-
-            # Try to parse JSON output from wrapper
-            if result.status == "success" and result.stdout:
-                try:
-                    # The wrapper outputs JSON with captured data
-                    import json
-
-                    output_data = json.loads(result.stdout)
-                    return {
-                        "success": True,
-                        "code": code,
-                        "stdout": output_data.get("stdout", ""),
-                        "stderr": "",
-                        "images": output_data.get("outputs", {}).get("images", []),
-                        "tables": output_data.get("outputs", {}).get("tables", []),
-                        "data": output_data.get("outputs", {}).get("data", {}),
-                    }
-                except (json.JSONDecodeError, KeyError):
-                    # Fallback to direct execution without viz capture
-                    result = await self.sandbox.execute(code)
-                    return {
-                        "success": result.status == "success",
-                        "code": code,
-                        "stdout": result.stdout or "",
-                        "stderr": result.stderr or "",
-                        "images": [],
-                        "tables": [],
-                        "data": {},
-                    }
-            else:
-                # Direct execution if initial execution failed
-                return {
-                    "success": result.status == "success",
-                    "code": code,
-                    "stdout": result.stdout or "",
-                    "stderr": result.stderr or "",
-                    "images": [],
-                    "tables": [],
-                    "data": {},
-                }
+            result = await self.sandbox.execute(code)
         except Exception as e:
             return {
                 "success": False,
                 "code": code,
                 "stdout": "",
                 "stderr": str(e),
+                "images": [],
+                "tables": [],
+                "data": {},
+            }
+        else:
+            return {
+                "success": result.status == "success",
+                "code": code,
+                "stdout": result.stdout or "",
+                "stderr": result.stderr or "",
                 "images": [],
                 "tables": [],
                 "data": {},
