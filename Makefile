@@ -20,6 +20,14 @@ install: ## Install production dependencies
 install-dev: ## Install all dependencies including dev
 	$(UV) sync --all-extras
 
+install-sandbox: ## Force reinstall langchain-sandbox from GitHub (never from PyPI)
+	pip uninstall -y langchain-sandbox || true
+	pip install git+https://github.com/johannhartmann/langchain-sandbox.git@main#subdirectory=libs/sandbox-py
+	@echo "✅ langchain-sandbox installed from GitHub repository"
+
+verify-sandbox: ## Verify langchain-sandbox is using GitHub source (not JSR)
+	$(PYTHON) scripts/verify_sandbox_source.py
+
 test: ## Run tests
 	$(UV) run pytest $(TEST_DIR) -v
 
@@ -42,6 +50,10 @@ test-fast: ## Run tests without slow integration tests
 
 test-parallel: ## Run tests in parallel
 	$(UV) run pytest $(TEST_DIR) -v -n auto
+
+test-docker-matplotlib: ## Run Docker integration test for matplotlib sandbox issues
+	@echo "Running Docker integration test for matplotlib..."
+	@python tests/test_docker_matplotlib.py
 
 lint: ## Run ruff linter
 	$(UV) run ruff check $(SRC_DIR) $(TEST_DIR)

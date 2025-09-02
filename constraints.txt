@@ -1,0 +1,6 @@
+# Constraint file to ensure langchain-sandbox is always installed from GitHub
+# This prevents accidental installation from PyPI which lacks our fixes
+
+# Force langchain-sandbox to be installed from GitHub repository
+# The official PyPI package does not include TypeScript support and matplotlib fixes
+langchain-sandbox @ git+https://github.com/johannhartmann/langchain-sandbox.git@main#subdirectory=libs/sandbox-py

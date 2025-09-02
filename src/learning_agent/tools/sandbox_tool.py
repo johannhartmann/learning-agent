@@ -1,11 +1,19 @@
-"""Enhanced Python sandbox tool with visualization support."""
+"""Enhanced Python sandbox tool with visualization support and error feedback."""
 
 from typing import Annotated, Any
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import InjectedToolCallId, tool
 from langchain_sandbox.pyodide import PyodideSandbox
+from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
+
+from learning_agent.state import LearningAgentState
+from learning_agent.tools.sandbox_config import patch_pyodide_sandbox
+
+
+# Ensure we're using the GitHub TypeScript source, not JSR
+patch_pyodide_sandbox()
 
 
 class EnhancedSandbox:
@@ -29,8 +37,7 @@ class EnhancedSandbox:
         Returns:
             Dictionary with stdout, stderr, images, tables, and execution metadata
         """
-        # For now, just execute the code directly without wrapping
-        # The sandbox should handle matplotlib installation internally
+        # Execute the user code directly
         full_code = code
 
         try:
@@ -92,6 +99,9 @@ class EnhancedSandbox:
 # Global sandbox instance (created on first use)
 _sandbox_instance: EnhancedSandbox | None = None
 
+# Maximum number of errors to keep in state
+MAX_ERROR_HISTORY = 5
+
 
 async def get_sandbox() -> EnhancedSandbox:
     """Get or create the global sandbox instance."""
@@ -114,46 +124,66 @@ async def get_sandbox() -> EnhancedSandbox:
 async def python_sandbox(
     code: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
+    state: Annotated[LearningAgentState, InjectedState],
     reset_state: bool = False,
 ) -> Command[Any]:
     """Execute Python code in a secure sandbox environment.
 
     CRITICAL: You MUST use print() to display output! The sandbox only shows what you print.
 
-    IMPORTANT: For packages like matplotlib, you must install them first:
+    PRE-INSTALLED PACKAGES:
+    The following packages will be pre-installed by the sandbox infrastructure:
+    - matplotlib, numpy, pandas, scipy, scikit-learn
+    - bokeh, altair, sympy, networkx, statsmodels
+
+    IMPORTANT: Do NOT manually install these pre-installed packages!
+    They are already available. Simply import them directly:
+    ```python
+    import matplotlib as mpl
+    import numpy as np
+    import pandas as pd
+    ```
+
+    ADDITIONAL PACKAGES:
+    For packages NOT in the pre-installed list, use micropip:
     ```python
     import micropip
 
-    await micropip.install("matplotlib")
-    import matplotlib.pyplot as plt
+    await micropip.install("package_name")
+    import package_name
     ```
+
+    ENVIRONMENT: This is a HEADLESS backend environment without display capabilities.
+    - GUI operations and interactive displays are not supported
+    - Save visualizations to files instead of trying to display them
+    - matplotlib automatically uses the appropriate backend for headless operation
+    - Never try to install matplotlib.pyplot
 
     Args:
         code: Python code to execute. Always use print() to show results.
         reset_state: If True, reset sandbox to clean state (default: False)
 
     Examples:
-        # Calculate factorial
-        def factorial(n):
-            if n <= 1:
-                return 1
-            return n * factorial(n - 1)
-
-        print(f"Factorial of 5: {factorial(5)}")
-
-        # String manipulation
-        text = "hello world"
-        print(f"Uppercase: {text.upper()}")
-        print(f"Word count: {len(text.split())}")
-
-        # For matplotlib plots:
-        import micropip
-        await micropip.install('matplotlib')
-        import matplotlib.pyplot as plt
+        # Using pre-installed numpy and matplotlib (NO installation needed!)
         import numpy as np
+        import matplotlib as mpl
+
         x = np.linspace(0, 2*np.pi, 100)
-        plt.plot(x, np.sin(x))
-        plt.show()
+        mpl.pyplot.plot(x, np.sin(x))
+        mpl.pyplot.savefig('/tmp/plot.png')
+        mpl.print("Plot saved successfully")
+
+        # Using pre-installed pandas
+        import pandas as pd
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]})
+        print(df.to_string())
+
+        # Installing a package that's NOT pre-installed
+        import micropip
+        await micropip.install('requests')
+        import requests
+        response = requests.get('https://api.example.com')
+        print(response.status_code)
     """
     sandbox = await get_sandbox()
 
@@ -162,18 +192,69 @@ async def python_sandbox(
     # TODO: Re-enable when langchain-sandbox supports reset without dill
     _ = reset_state  # Acknowledge the parameter even though we don't use it
 
+    # Get error history from state
+    error_history = state.get("sandbox_error_history", [])
+
+    # Check for previous similar errors
+    code_snippet = code[:200]  # First 200 chars for comparison
+
+    # Use list comprehension for better performance
+    previous_errors = [
+        error_entry["error"]
+        for error_entry in error_history
+        if (
+            "import matplotlib.pyplot" in code
+            and "matplotlib.pyplot" in error_entry.get("error", "")
+        )
+        or error_entry.get("code_snippet", "")[:100] in code
+    ]
+
     try:
         # Execute code with visualization capture
         result = await sandbox.execute_with_viz(code)
 
+        # Track errors for future reference in state
+        state_updates = {}
+        if not result["success"] and result.get("stderr"):
+            new_error = {
+                "code_snippet": code_snippet,
+                "error": result["stderr"],
+            }
+            updated_history = [*error_history, new_error]
+            # Keep only recent errors
+            if len(updated_history) > MAX_ERROR_HISTORY:
+                updated_history = updated_history[-MAX_ERROR_HISTORY:]
+            state_updates["sandbox_error_history"] = updated_history
+
         # Format response message
         response_parts = []
+
+        # IMPORTANT: Always show previous errors first if they exist
+        if previous_errors:
+            response_parts.append(
+                "⚠️ **IMPORTANT - Previous Attempt Failed with Similar Code:**\n"
+                "The following error occurred when similar code was tried before:\n"
+                + "\n".join(f"```\n{err[:500]}\n```" for err in previous_errors[-2:])
+                + "\n**Please use a different approach to avoid this error.**\n"
+            )
 
         if result.get("stdout"):
             response_parts.append(f"**Output:**\n```\n{result['stdout']}\n```")
 
         if result.get("stderr"):
             response_parts.append(f"**Errors:**\n```\n{result['stderr']}\n```")
+
+            # Add specific guidance for the matplotlib.pyplot error
+            if "Failed to install required Python packages: matplotlib.pyplot" in result["stderr"]:
+                response_parts.append(
+                    "\n**Error Guidance:**\n"
+                    "❌ The error shows you're trying to install 'matplotlib.pyplot' which doesn't exist.\n"
+                    "✅ matplotlib is already pre-installed! Just use:\n"
+                    "```python\n"
+                    "import matplotlib.pyplot as plt\n"
+                    "```\n"
+                    "Do NOT use micropip to install matplotlib - it's already available!"
+                )
 
         if result.get("images"):
             response_parts.append(f"\n**Generated {len(result['images'])} image(s)**\n")
@@ -197,10 +278,11 @@ async def python_sandbox(
             else "Code executed successfully (no output)"
         )
 
-        # Return the response message
+        # Return the response message with state updates
         return Command(
             update={
                 "messages": [ToolMessage(response, tool_call_id=tool_call_id)],
+                **state_updates,  # Include state updates if there are any
             }
         )
 

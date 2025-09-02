@@ -1,0 +1,9 @@
+# Requirements file specifically for langchain-sandbox from GitHub
+# Use this file if installing langchain-sandbox separately
+#
+# IMPORTANT: Never install langchain-sandbox from PyPI!
+# The PyPI version lacks TypeScript support and matplotlib fixes.
+#
+# To install: pip install -r requirements-sandbox.txt
+
+git+https://github.com/johannhartmann/langchain-sandbox.git@main#subdirectory=libs/sandbox-py

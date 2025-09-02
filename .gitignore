@@ -125,3 +125,7 @@ credentials/
 # Claude
 CLAUDE.md
 ui/
+
+node_modules/
+.playwright-mcp/
+matplotlib

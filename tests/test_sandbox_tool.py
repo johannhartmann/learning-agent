@@ -1,6 +1,5 @@
 """Unit tests for the enhanced Python sandbox tool."""
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -31,75 +30,100 @@ class TestEnhancedSandbox:
             assert sandbox.session_state is None
 
     @pytest.mark.asyncio
-    async def test_wrap_code_for_viz(self):
-        """Test code wrapping for visualization capture."""
-        with patch("learning_agent.tools.sandbox_tool.PyodideSandbox"):
-            sandbox = EnhancedSandbox()
-            code = 'print("hello")'
-            wrapped = sandbox._wrap_code_for_viz(code)
+    async def test_execute_with_viz_wrapping(self):
+        """Test that execute_with_viz properly handles code."""
+        with patch("learning_agent.tools.sandbox_tool.PyodideSandbox") as mock_pyodide:
+            mock_instance = AsyncMock()
+            # Create a mock result object
+            mock_result = MagicMock()
+            mock_result.status = "success"
+            mock_result.stdout = "test output"
+            mock_result.stderr = ""
+            mock_instance.execute = AsyncMock(return_value=mock_result)
+            mock_pyodide.return_value = mock_instance
 
-            # Check that the wrapper includes essential components
-            assert "import matplotlib" in wrapped
-            assert "import pandas" in wrapped
-            assert "_captured_outputs" in wrapped
-            assert 'print("hello")' in wrapped
-            assert "json.dumps(_result)" in wrapped
+            sandbox = EnhancedSandbox()
+            # Test that the sandbox can be created and has the expected method
+            assert hasattr(sandbox, "execute_with_viz")
+            assert callable(sandbox.execute_with_viz)
+
+            # Test that it can execute code
+            result = await sandbox.execute_with_viz("print('test')")
+            assert result["success"] is True
+            assert result["stdout"] == "test output"
 
     @pytest.mark.asyncio
-    async def test_wrap_code_with_triple_quotes(self):
-        """Test code wrapping with triple quotes in the code."""
-        with patch("learning_agent.tools.sandbox_tool.PyodideSandbox"):
+    async def test_execute_with_triple_quotes(self):
+        """Test code execution with triple quotes in the code."""
+        with patch("learning_agent.tools.sandbox_tool.PyodideSandbox") as mock_pyodide:
+            mock_instance = AsyncMock()
+            # Create a mock result object
+            mock_result = MagicMock()
+            mock_result.status = "success"
+            mock_result.stdout = "test"
+            mock_result.stderr = ""
+            mock_instance.execute = AsyncMock(return_value=mock_result)
+            mock_pyodide.return_value = mock_instance
+
             sandbox = EnhancedSandbox()
             code = '"""This is a docstring"""\nprint("test")'
-            wrapped = sandbox._wrap_code_for_viz(code)
+            result = await sandbox.execute_with_viz(code)
 
-            # Should handle triple quotes properly
-            assert '\\"\\"\\"' in wrapped or '"""' not in wrapped
-            assert 'print("test")' in wrapped
-
-    @pytest.mark.asyncio
-    async def test_parse_outputs_json_success(self):
-        """Test parsing JSON outputs from sandbox execution."""
-        with patch("learning_agent.tools.sandbox_tool.PyodideSandbox"):
-            sandbox = EnhancedSandbox()
-            result_json = json.dumps(
-                {
-                    "stdout": "Hello, world!",
-                    "outputs": {
-                        "images": [{"type": "matplotlib", "base64": "abc123"}],
-                        "tables": [{"name": "df", "shape": [5, 3]}],
-                        "data": {"key": "value"},
-                    },
-                }
-            )
-
-            parsed = sandbox._parse_outputs(result_json, "test_code")
-
-            assert parsed["success"] is True
-            assert parsed["code"] == "test_code"
-            assert parsed["stdout"] == "Hello, world!"
-            assert len(parsed["images"]) == 1
-            assert parsed["images"][0]["type"] == "matplotlib"
-            assert len(parsed["tables"]) == 1
-            assert parsed["tables"][0]["name"] == "df"
-            assert parsed["data"]["key"] == "value"
+            # Should handle the code and return a result
+            assert isinstance(result, dict)
+            assert "code" in result
+            assert result["success"] is True
+            assert result["stdout"] == "test"
 
     @pytest.mark.asyncio
-    async def test_parse_outputs_fallback(self):
-        """Test parsing non-JSON outputs (fallback mode)."""
-        with patch("learning_agent.tools.sandbox_tool.PyodideSandbox"):
+    async def test_execute_with_viz_json_output(self):
+        """Test execute_with_viz handling JSON outputs from sandbox."""
+        with patch("learning_agent.tools.sandbox_tool.PyodideSandbox") as mock_pyodide:
+            mock_instance = AsyncMock()
+            # Create a mock result object with the expected attributes
+            mock_result = MagicMock()
+            mock_result.status = "success"
+            mock_result.stdout = "__MATPLOTLIB_FIGURE__:abc123:__END_FIGURE__\nHello, world!"
+            mock_result.stderr = ""
+
+            mock_instance.execute = AsyncMock(return_value=mock_result)
+            mock_pyodide.return_value = mock_instance
+
             sandbox = EnhancedSandbox()
-            result = "Simple text output"
+            result = await sandbox.execute_with_viz("test_code")
 
-            parsed = sandbox._parse_outputs(result, "test_code")
+            # Check the result structure
+            assert result["success"] is True
+            assert result["code"] == "test_code"
+            assert "Hello, world!" in result["stdout"]
+            assert len(result["images"]) == 1
+            assert result["images"][0]["type"] == "matplotlib"
+            assert result["images"][0]["base64"] == "abc123"
 
-            assert parsed["success"] is True
-            assert parsed["code"] == "test_code"
-            assert parsed["stdout"] == "Simple text output"
-            assert parsed["stderr"] == ""
-            assert parsed["images"] == []
-            assert parsed["tables"] == []
-            assert parsed["data"] == {}
+    @pytest.mark.asyncio
+    async def test_execute_with_viz_text_output(self):
+        """Test execute_with_viz handling plain text outputs."""
+        with patch("learning_agent.tools.sandbox_tool.PyodideSandbox") as mock_pyodide:
+            mock_instance = AsyncMock()
+            # Create a mock result object with the expected attributes
+            mock_result = MagicMock()
+            mock_result.status = "success"
+            mock_result.stdout = "Simple text output"
+            mock_result.stderr = ""
+
+            mock_instance.execute = AsyncMock(return_value=mock_result)
+            mock_pyodide.return_value = mock_instance
+
+            sandbox = EnhancedSandbox()
+            result = await sandbox.execute_with_viz("test_code")
+
+            # Should handle plain text output
+            assert result["success"] is True
+            assert result["code"] == "test_code"
+            assert result["stdout"] == "Simple text output"
+            assert result["stderr"] == ""
+            assert result["images"] == []
+            assert result["tables"] == []
 
     @pytest.mark.asyncio
     async def test_execute_with_viz_success(self):
@@ -109,17 +133,14 @@ class TestEnhancedSandbox:
 
             # Mock the execute method directly on sandbox
             sandbox.sandbox = MagicMock()
-            sandbox.sandbox.execute = AsyncMock()
-            sandbox.sandbox.execute.return_value = MagicMock(
-                status="success", stdout="Execution complete", stderr=""
-            )
+            mock_result = MagicMock(status="success", stdout="Execution complete", stderr="")
+            sandbox.sandbox.execute = AsyncMock(return_value=mock_result)
 
             result = await sandbox.execute_with_viz("print('test')")
 
             assert result["success"] is True
-            # With the current implementation, result comes from execute
-            assert result["success"] is True
             assert result["code"] == "print('test')"
+            assert result["stdout"] == "Execution complete"
             sandbox.sandbox.execute.assert_called_once()
 
     @pytest.mark.asyncio
@@ -246,7 +267,8 @@ class TestPythonSandboxTool:
 
             # Should mention the generated visualizations
             assert "Generated 1 image(s)" in content
-            assert "matplotlib" in content
+            # The code content might not appear in the output message
+            assert "Plot created" in content
             assert "Generated 1 table(s)" in content
             assert "10 rows x 3 columns" in content
 

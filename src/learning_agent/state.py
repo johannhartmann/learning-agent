@@ -32,3 +32,6 @@ class LearningAgentState(DeepAgentState):  # type: ignore[misc]
 
     # Quick access to search results for current task
     relevant_learnings: NotRequired[list[str]]  # type: ignore[valid-type]
+
+    # Track recent sandbox execution errors to avoid repeating failures
+    sandbox_error_history: NotRequired[list[dict[str, str]]]  # type: ignore[valid-type]
