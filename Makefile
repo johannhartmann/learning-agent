@@ -28,16 +28,17 @@ install-sandbox: ## Force reinstall langchain-sandbox from GitHub (never from Py
 verify-sandbox: ## Verify langchain-sandbox is using GitHub source (not JSR)
 	$(PYTHON) scripts/verify_sandbox_source.py
 
-test: ## Run tests
+## Local test targets (using uv)
+test-local: ## Run tests locally with uv
 	$(UV) run pytest $(TEST_DIR) -v
 
-test-unit: ## Run only unit tests
+test-unit-local: ## Run only unit tests locally
 	$(UV) run pytest $(TEST_DIR)/test_basic.py -v
 
-test-integration: ## Run only integration tests
+test-integration-local: ## Run only integration tests locally
 	$(UV) run pytest $(TEST_DIR)/test_integration.py -v
 
-test-cov: ## Run tests with coverage report
+test-cov-local: ## Run tests with coverage report locally
 	$(UV) run pytest $(TEST_DIR) \
 		--cov=$(SRC_DIR) \
 		--cov-report=term-missing \
@@ -45,15 +46,41 @@ test-cov: ## Run tests with coverage report
 		--cov-report=xml \
 		-v
 
-test-fast: ## Run tests without slow integration tests
+test-fast-local: ## Run tests without slow integration tests locally
 	$(UV) run pytest $(TEST_DIR) -v -m "not slow"
 
-test-parallel: ## Run tests in parallel
+test-parallel-local: ## Run tests in parallel locally
 	$(UV) run pytest $(TEST_DIR) -v -n auto
 
-test-docker-matplotlib: ## Run Docker integration test for matplotlib sandbox issues
-	@echo "Running Docker integration test for matplotlib..."
-	@python tests/test_docker_matplotlib.py
+## Docker test targets (preferred)
+test: ## Run all tests in Docker
+	@echo "Building test container..."
+	@docker-compose build test
+	@echo "Running tests in Docker..."
+	@docker-compose run --rm test
+
+test-unit: ## Run unit tests in Docker
+	@docker-compose run --rm test python -m pytest tests/test_basic.py -v
+
+test-integration: ## Run integration tests in Docker
+	@docker-compose run --rm test python -m pytest tests/test_integration.py -v
+
+test-sandbox: ## Run sandbox tests in Docker
+	@docker-compose run --rm test python -m pytest tests/test_sandbox_tool.py -v
+
+test-cov: ## Run tests with coverage in Docker
+	@docker-compose run --rm test python -m pytest tests/ \
+		--cov=src/learning_agent \
+		--cov-report=term-missing \
+		--cov-report=html:htmlcov \
+		--cov-report=xml \
+		-v
+
+test-docker-matplotlib: ## Run matplotlib tests in Docker
+	@docker-compose run --rm test python -m pytest tests/test_docker_matplotlib.py -v -s
+
+test-docker-build: ## Build the test Docker image
+	@docker-compose build test
 
 lint: ## Run ruff linter
 	$(UV) run ruff check $(SRC_DIR) $(TEST_DIR)
