@@ -104,6 +104,12 @@ class TestMatplotlibConfiguration:
     @pytest.mark.integration
     def test_docker_compose_config(self):
         """Test Docker Compose configuration is correct."""
+        import os
+
+        # Skip this test when running in Docker (files not copied)
+        if os.environ.get("DOCKER_ENV"):
+            pytest.skip("Skipping Docker config test when running in Docker container")
+
         # Check docker-compose.yml exists
         compose_file = Path(__file__).parent.parent / "docker-compose.yml"
         assert compose_file.exists(), "docker-compose.yml should exist"
