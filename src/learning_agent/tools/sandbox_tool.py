@@ -25,16 +25,10 @@ class EnhancedSandbox:
         Args:
             allow_network: Whether to allow network access for package installation
         """
-        # Enable file return and track common matplotlib output paths
+        # Enable stateful sandbox with network access control
         self.sandbox = PyodideSandbox(
             stateful=True,
             allow_net=allow_network,
-            return_files=True,  # Enable file return from sandbox
-            file_paths=[
-                "/tmp",
-                "/sandbox",
-            ],  # Paths to monitor for files # nosec B108 - sandbox environment
-            max_file_size=10 * 1024 * 1024,  # 10MB max file size
         )
         self.session_state = None
 

@@ -26,14 +26,14 @@ class TestDockerMatplotlibIntegration:
     """Test matplotlib functionality through the full LangGraph agent stack."""
 
     @pytest.fixture
-    async def agent_with_memory(self, tmp_path):
+    def agent_with_memory(self, tmp_path):
         """Create a learning agent with memory for testing."""
         storage_path = tmp_path / "test_storage"
         storage_path.mkdir(exist_ok=True)
 
-        # Create agent with memory saver for state persistence
-        memory = MemorySaver()
-        agent = create_learning_agent(storage_path=str(storage_path), memory=memory)
+        # Create agent - it has built-in memory through LangGraph
+        agent = create_learning_agent(storage_path=storage_path)
+        memory = MemorySaver()  # Keep for compatibility but agent has its own memory
         return agent, memory
 
     @pytest.mark.asyncio

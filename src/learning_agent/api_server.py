@@ -156,13 +156,16 @@ async def get_file(file_path: str, thread_id: str | None = None) -> Response:
     """
     import base64
 
-    import httpx  # type: ignore[import-not-found]
+    try:
+        import httpx  # type: ignore[import-not-found]
+    except ImportError:
+        httpx = None  # type: ignore[assignment]
 
     # Normalize the path
     normalized_path = file_path if file_path.startswith("/") else f"/{file_path}"
 
     # Try to fetch from LangGraph server state if thread_id is provided
-    if thread_id:
+    if thread_id and httpx:
         try:
             # Connect to LangGraph server API to get thread state
             async with httpx.AsyncClient(timeout=30.0) as client:

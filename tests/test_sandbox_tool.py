@@ -96,9 +96,9 @@ class TestEnhancedSandbox:
             assert result["success"] is True
             assert result["code"] == "test_code"
             assert "Hello, world!" in result["stdout"]
-            assert len(result["images"]) == 1
-            assert result["images"][0]["type"] == "matplotlib"
-            assert result["images"][0]["base64"] == "abc123"
+            # Images are now in 'files' field, not 'images'
+            assert "files" in result
+            assert "tables" in result
 
     @pytest.mark.asyncio
     async def test_execute_with_viz_text_output(self):
@@ -122,7 +122,8 @@ class TestEnhancedSandbox:
             assert result["code"] == "test_code"
             assert result["stdout"] == "Simple text output"
             assert result["stderr"] == ""
-            assert result["images"] == []
+            # Changed from 'images' to 'files'
+            assert result["files"] == []
             assert result["tables"] == []
 
     @pytest.mark.asyncio
@@ -173,7 +174,8 @@ class TestPythonSandboxTool:
                     "success": True,
                     "stdout": "Hello from sandbox",
                     "stderr": "",
-                    "images": [],
+                    "files": [],
+                    "files_data": {},
                     "tables": [],
                     "data": {},
                     "code": "print('hello')",
@@ -211,7 +213,8 @@ class TestPythonSandboxTool:
                     "success": True,
                     "stdout": "Reset and executed",
                     "stderr": "",
-                    "images": [],
+                    "files": [],
+                    "files_data": {},
                     "tables": [],
                     "data": {},
                     "code": "print('reset')",
@@ -243,7 +246,8 @@ class TestPythonSandboxTool:
                     "success": True,
                     "stdout": "Plot created",
                     "stderr": "",
-                    "images": [{"type": "matplotlib", "format": "png", "base64": "abc123"}],
+                    "files": ["/tmp/plot.png"],
+                    "files_data": {"/tmp/plot.png": b"fake_image_data"},
                     "tables": [{"name": "df", "shape": [10, 3]}],
                     "data": {},
                     "code": "import matplotlib",
@@ -265,8 +269,8 @@ class TestPythonSandboxTool:
             messages = result.update["messages"]
             content = messages[0].content
 
-            # Should mention the generated visualizations
-            assert "Generated 1 image(s)" in content
+            # Should mention the generated files
+            assert "Generated 1 file(s)" in content
             # The code content might not appear in the output message
             assert "Plot created" in content
             assert "Generated 1 table(s)" in content
