@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from learning_agent.learning.langmem_integration import get_learning_system
@@ -140,6 +141,100 @@ async def get_memories() -> MemoriesResponse:
 async def health_check() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.get("/api/files/{file_path:path}")
+async def get_file(file_path: str, thread_id: str | None = None) -> Response:
+    """Retrieve a file from the session state via LangGraph API.
+
+    Args:
+        file_path: Path to the file in the virtual filesystem
+        thread_id: Optional thread ID to fetch state from (for session isolation)
+
+    Returns:
+        File content with appropriate content type
+    """
+    import base64
+
+    import httpx  # type: ignore[import-not-found]
+
+    # Normalize the path
+    normalized_path = file_path if file_path.startswith("/") else f"/{file_path}"
+
+    # Try to fetch from LangGraph server state if thread_id is provided
+    if thread_id:
+        try:
+            # Connect to LangGraph server API to get thread state
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"http://localhost:2024/threads/{thread_id}/state",
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Api-Key": "test-key",
+                    },
+                )
+
+                if response.status_code == 200:
+                    state_data = response.json()
+                    # Get files from the state
+                    files = state_data.get("values", {}).get("files", {})
+
+                    # Try different path variations
+                    path_variations = [
+                        normalized_path,
+                        file_path,
+                        f"/sandbox/{file_path}"
+                        if not file_path.startswith("/sandbox")
+                        else file_path,
+                    ]
+
+                    for path in path_variations:
+                        if path in files:
+                            # Decode base64 content
+                            file_content = base64.b64decode(files[path])
+
+                            # Determine content type based on file extension
+                            if path.endswith(".png"):
+                                media_type = "image/png"
+                            elif path.endswith((".jpg", ".jpeg")):
+                                media_type = "image/jpeg"
+                            elif path.endswith(".svg"):
+                                media_type = "image/svg+xml"
+                            elif path.endswith(".json"):
+                                media_type = "application/json"
+                            else:
+                                media_type = "application/octet-stream"
+
+                            return Response(
+                                content=file_content,
+                                media_type=media_type,
+                                headers={"Cache-Control": "no-cache"},  # Don't cache session data
+                            )
+        except Exception:
+            logger.exception("Error fetching file from thread state")
+
+    # If file is a plot but not found, return a placeholder
+    if "plots" in file_path:
+        # Generate a simple placeholder SVG image (no PIL dependency needed)
+        filename = file_path.split("/")[-1]
+        svg_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="300" fill="white" stroke="gray" stroke-width="2"/>
+  <text x="200" y="150" text-anchor="middle" font-family="Arial" font-size="16" fill="black">
+    Plot: {filename}
+  </text>
+  <text x="200" y="180" text-anchor="middle" font-family="Arial" font-size="12" fill="gray">
+    (Session file not found - ensure thread_id is provided)
+  </text>
+</svg>"""
+
+        return Response(
+            content=svg_content.encode("utf-8"),
+            media_type="image/svg+xml",
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
 
 
 if __name__ == "__main__":

@@ -25,7 +25,17 @@ class EnhancedSandbox:
         Args:
             allow_network: Whether to allow network access for package installation
         """
-        self.sandbox = PyodideSandbox(stateful=True, allow_net=allow_network)
+        # Enable file return and track common matplotlib output paths
+        self.sandbox = PyodideSandbox(
+            stateful=True,
+            allow_net=allow_network,
+            return_files=True,  # Enable file return from sandbox
+            file_paths=[
+                "/tmp",
+                "/sandbox",
+            ],  # Paths to monitor for files # nosec B108 - sandbox environment
+            max_file_size=10 * 1024 * 1024,  # 10MB max file size
+        )
         self.session_state = None
 
     async def execute_with_viz(self, code: str) -> dict[str, Any]:
@@ -35,51 +45,55 @@ class EnhancedSandbox:
             code: Python code to execute
 
         Returns:
-            Dictionary with stdout, stderr, images, tables, and execution metadata
+            Dictionary with stdout, stderr, files, and execution metadata
         """
-        # Execute the user code directly
-        full_code = code
-
+        # Don't wrap the code - let the user control file saving
+        # This avoids duplicate image generation
         try:
-            result = await self.sandbox.execute(full_code)
+            result = await self.sandbox.execute(code)
         except Exception as e:
             return {
                 "success": False,
                 "code": code,
                 "stdout": "",
                 "stderr": str(e),
-                "images": [],
+                "files": [],
                 "tables": [],
                 "data": {},
             }
 
-        # Parse output for matplotlib figures
-        images: list[dict[str, Any]] = []
-        stdout = result.stdout or ""
+        # Extract list of created files from the new files API
+        files = []
+        files_data = {}
 
-        if "__MATPLOTLIB_FIGURE__:" in stdout:
-            # Extract base64 images from stdout
+        # Use the new files attribute from the sandbox result
+        if hasattr(result, "files") and result.files:
+            for filepath, content in result.files.items():
+                files.append(filepath)
+                # Store the raw bytes directly
+                files_data[filepath] = content
+
+        # Also extract any file paths mentioned in stdout for backwards compatibility
+        if result.stdout:
             import re
 
-            pattern = r"__MATPLOTLIB_FIGURE__:([^:]+):__END_FIGURE__"
-            matches = re.findall(pattern, stdout)
-            images.extend(
-                {
-                    "type": "matplotlib",
-                    "format": "png",
-                    "base64": match,
-                }
-                for match in matches
-            )
-            # Clean stdout by removing the figure markers
-            stdout = re.sub(pattern, "", stdout).strip()
+            # Extract file paths from "Saved plot to /path/to/file.png" messages
+            path_matches = re.findall(r"Saved plot to (/[^\s]+)", result.stdout)
+            for path in path_matches:
+                if path not in files and hasattr(result, "get_file"):
+                    # Try to get the file using the new API
+                    file_content = result.get_file(path)
+                    if file_content:
+                        files.append(path)
+                        files_data[path] = file_content
 
         return {
             "success": result.status == "success",
             "code": code,
-            "stdout": stdout,
+            "stdout": result.stdout or "",
             "stderr": result.stderr or "",
-            "images": images,
+            "files": files,
+            "files_data": files_data,  # Include actual file data
             "tables": [],
             "data": {},
         }
@@ -256,13 +270,15 @@ async def python_sandbox(
                     "Do NOT use micropip to install matplotlib - it's already available!"
                 )
 
-        if result.get("images"):
-            response_parts.append(f"\n**Generated {len(result['images'])} image(s)**\n")
-            for idx, img in enumerate(result["images"]):
-                # Include the image as a markdown data URI that the UI can render
-                response_parts.append(
-                    f"![Figure {idx + 1}](data:image/{img.get('format', 'png')};base64,{img['base64']})"
-                )
+        if result.get("files"):
+            response_parts.append(f"\n**Generated {len(result['files'])} file(s):**\n")
+            for file_path in result["files"]:
+                response_parts.append(f"- {file_path}\n")
+                # Add image display for image files
+                if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".svg")):
+                    response_parts.append(
+                        f"![{file_path.split('/')[-1]}](sandbox-file:{file_path})\n"
+                    )
 
         if result.get("tables"):
             response_parts.append(f"\n**Generated {len(result['tables'])} table(s)**")
@@ -277,6 +293,42 @@ async def python_sandbox(
             if response_parts
             else "Code executed successfully (no output)"
         )
+
+        # Store generated files in the agent state as base64-encoded data
+        # This maintains complete isolation - files exist only in memory per session
+        if result.get("files"):
+            import base64
+
+            # Get existing files from state or create new dict
+            files = state.get("files", {})
+
+            # Get the files_data with actual content from sandbox
+            files_data = result.get("files_data", {})
+
+            # Store files in state as base64-encoded data
+            for file_path in result["files"]:
+                if file_path in files_data:
+                    try:
+                        file_bytes = files_data[file_path]
+                        # Ensure it's bytes
+                        if isinstance(file_bytes, str):
+                            # Already base64 (shouldn't happen with new API)
+                            files[file_path] = file_bytes
+                        elif isinstance(file_bytes, bytes):
+                            # Encode bytes to base64 for storage in state
+                            files[file_path] = base64.b64encode(file_bytes).decode("utf-8")
+                        else:
+                            # Convert to bytes if needed
+                            file_bytes = bytes(file_bytes)
+                            files[file_path] = base64.b64encode(file_bytes).decode("utf-8")
+
+                        print(f"Stored file {file_path} in session memory")
+                    except Exception as e:
+                        print(f"Error storing file {file_path}: {e}")
+                else:
+                    print(f"File {file_path} has no data")
+
+            state_updates["files"] = files
 
         # Return the response message with state updates
         return Command(

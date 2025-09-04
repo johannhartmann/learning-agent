@@ -35,3 +35,6 @@ class LearningAgentState(DeepAgentState):  # type: ignore[misc]
 
     # Track recent sandbox execution errors to avoid repeating failures
     sandbox_error_history: NotRequired[list[dict[str, str]]]  # type: ignore[valid-type]
+
+    # Store sandbox-generated files as base64-encoded data for session isolation
+    files: NotRequired[dict[str, str]]  # type: ignore[valid-type]
