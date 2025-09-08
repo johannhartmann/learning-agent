@@ -26,6 +26,30 @@ export const FileViewDialog = React.memo<FileViewDialogProps>(
       return fileExtension === "md" || fileExtension === "markdown";
     }, [fileExtension]);
 
+    const isImage = useMemo(() => {
+      return ["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp"].includes(
+        fileExtension,
+      );
+    }, [fileExtension]);
+
+    const mimeType = useMemo(() => {
+      const map: Record<string, string> = {
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        gif: "image/gif",
+        svg: "image/svg+xml",
+        webp: "image/webp",
+        bmp: "image/bmp",
+        txt: "text/plain",
+        md: "text/markdown",
+        markdown: "text/markdown",
+        json: "application/json",
+        csv: "text/csv",
+      };
+      return map[fileExtension] || "application/octet-stream";
+    }, [fileExtension]);
+
     const language = useMemo(() => {
       const languageMap: Record<string, string> = {
         js: "javascript",
@@ -66,24 +90,41 @@ export const FileViewDialog = React.memo<FileViewDialogProps>(
     }, [fileExtension]);
 
     const handleCopy = useCallback(() => {
-      if (file.content) {
+      if (!file.content) return;
+      // Copy text files; skip binary
+      if (!isImage && mimeType.startsWith("text/")) {
         navigator.clipboard.writeText(file.content);
       }
-    }, [file.content]);
+    }, [file.content, isImage, mimeType]);
 
     const handleDownload = useCallback(() => {
-      if (file.content) {
-        const blob = new Blob([file.content], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = file.path;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+      if (!file.content) return;
+      let blob: Blob;
+      try {
+        if (isImage) {
+          // file.content is base64; decode to binary
+          const byteString = atob(file.content);
+          const bytes = new Uint8Array(byteString.length);
+          for (let i = 0; i < byteString.length; i++) {
+            bytes[i] = byteString.charCodeAt(i);
+          }
+          blob = new Blob([bytes], { type: mimeType });
+        } else {
+          blob = new Blob([file.content], { type: mimeType });
+        }
+      } catch {
+        // Fallback to text
+        blob = new Blob([file.content], { type: "application/octet-stream" });
       }
-    }, [file.content, file.path]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.path.split("/").pop() || "download";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, [file.content, file.path, isImage, mimeType]);
 
     return (
       <Dialog open={true} onOpenChange={onClose}>
@@ -121,6 +162,16 @@ export const FileViewDialog = React.memo<FileViewDialogProps>(
               isMarkdown ? (
                 <div className={styles.markdownWrapper}>
                   <MarkdownContent content={file.content} />
+                </div>
+              ) : isImage ? (
+                <div className={styles.markdownWrapper}>
+                  {/* Render image from base64 content */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`data:${mimeType};base64,${file.content}`}
+                    alt={file.path}
+                    style={{ maxWidth: "100%", height: "auto" }}
+                  />
                 </div>
               ) : (
                 <SyntaxHighlighter
