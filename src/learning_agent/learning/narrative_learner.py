@@ -1,9 +1,12 @@
 """Natural language learning system with deep reflection and semantic search."""
 
+from __future__ import annotations
+
 import asyncio
+import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 from uuid import uuid4
 
 import faiss
@@ -13,26 +16,49 @@ import numpy as np
 from langmem import create_memory_manager
 from pydantic import BaseModel, Field
 
+from learning_agent.config import settings
+from learning_agent.providers import get_chat_model, get_embeddings
+
+
+if TYPE_CHECKING:  # Only for typing
+    from collections.abc import Callable
+
+    from langchain_core.runnables import RunnableConfig
+
 
 class TraceableProto(Protocol):
-    def __call__(self, **kwargs: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:  # noqa: D401
+    def __call__(self, **kwargs: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """A decorator factory used for tracing functions."""
 
-try:
-    from langsmith import traceable as _traceable_import
-    traceable = cast(Any, _traceable_import)
-except ImportError:  # pragma: no cover - optional dependency
-    # Fallback if langsmith is not installed
-    def _fallback_traceable(**kwargs: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:  # noqa: ARG001
+
+# Control LangSmith tracing via environment variables. Default: disabled in CI.
+_tracing_enabled = os.getenv("LANGSMITH_TRACING", "false").lower() in {"1", "true", "yes"}
+_has_langsmith_key = bool(os.getenv("LANGSMITH_API_KEY"))
+if _tracing_enabled and _has_langsmith_key:
+    try:
+        from langsmith import traceable as _traceable_import
+
+        traceable = cast("Any", _traceable_import)
+    except ImportError:  # pragma: no cover - optional dependency
+        # Fallback if langsmith is not installed
+        def _fallback_traceable(
+            **_kwargs: Any,
+        ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                return func
+
+            return decorator
+
+        traceable = cast("Any", _fallback_traceable)
+else:
+    # Explicit no-op when tracing disabled or missing key
+    def _fallback_traceable(**_kwargs: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             return func
 
         return decorator
-    traceable = cast(Any, _fallback_traceable)
 
-
-from learning_agent.config import settings
-from learning_agent.providers import get_chat_model, get_embeddings
+    traceable = cast("Any", _fallback_traceable)
 
 
 class NarrativeMemory(BaseModel):
@@ -197,12 +223,9 @@ Write a narrative memory of this experience. Include:
 Write this as a story I'm telling my future self - conversational, insightful, and honest about what happened."""
 
         structured_llm = self.llm.with_structured_output(NarrativeMemory)
-        from langchain_core.runnables import RunnableConfig
 
         config: RunnableConfig | None = {"callbacks": callbacks} if callbacks else None
-        narrative_response = await structured_llm.ainvoke(
-            narrative_prompt, config=config
-        )
+        narrative_response = await structured_llm.ainvoke(narrative_prompt, config=config)
         if isinstance(narrative_response, NarrativeMemory):
             narrative = narrative_response.narrative
         else:
