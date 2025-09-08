@@ -21,11 +21,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # LangGraph server for the learning agent
+  # LangGraph server for the learning agent (uses prebuilt image from langgraph build)
   server:
-    build:
-      context: .
-      dockerfile: Dockerfile.server
+    image: ${LG_SERVER_IMAGE:-learning_agent_server:latest}
     container_name: learning-agent-server
     ports:
       - "2024:2024"
@@ -41,7 +39,6 @@ services:
       - DATABASE_URL=postgresql://learning_agent:learning_agent_pass@postgres:5432/learning_memories
       - BG_JOB_ISOLATED_LOOPS=true
     volumes:
-      - ./src:/app/src:ro
       - ./.agent:/app/.agent
     networks:
       - learning-agent-network

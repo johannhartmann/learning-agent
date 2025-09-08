@@ -1,5 +1,12 @@
 {
-  "dependencies": ["."],
+  "dependencies": [
+    ".",
+    "langgraph-checkpoint-postgres",
+    "psycopg[binary,pool]"
+  ],
+  "dockerfile_lines": [
+    "RUN pip install --no-cache-dir langgraph-checkpoint-postgres 'psycopg[binary,pool]'"
+  ],
   "graphs": {
     "learning_agent": "src.learning_agent.server:graph"
   },

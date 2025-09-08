@@ -9,11 +9,10 @@ from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
 from learning_agent.state import LearningAgentState
-from learning_agent.tools.sandbox_config import patch_pyodide_sandbox
 
 
-# Ensure we're using the GitHub TypeScript source, not JSR
-patch_pyodide_sandbox()
+# Note: TypeScript source is now baked into Docker image via LANGCHAIN_SANDBOX_TS_PATH
+# No need to patch at runtime - pyodide.py handles this correctly now
 
 
 class EnhancedSandbox:
@@ -25,10 +24,25 @@ class EnhancedSandbox:
         Args:
             allow_network: Whether to allow network access for package installation
         """
-        # Enable stateful sandbox with network access control
+        # Enable sandbox with network access control
+        # Need to allow read/write access to Deno cache directory for pyodide files
+        # Note: stateful=False to avoid dill dependency which isn't available in Pyodide
         self.sandbox = PyodideSandbox(
-            stateful=True,
+            stateful=False,  # Disabled to avoid dill installation issue
             allow_net=allow_network,
+            allow_read=[
+                "/app/node_modules",
+                "/app/node_modules/.deno",  # Deno cache directory for pyodide files
+                "/opt/langchain_sandbox",
+                "/data/src/ml/learning_agent/node_modules",  # Add local node_modules for testing
+            ],
+            allow_write=[
+                "/app/node_modules",
+                "/app/node_modules/.deno",  # Deno needs write for cache
+                "/tmp",  # Also allow writing to /tmp for files
+            ],  # Deno needs to write to entire node_modules for cache
+            return_files=True,  # IMPORTANT: Return files from virtual filesystem
+            file_paths=["/tmp", "/sandbox", "."],  # Paths to check for files
         )
         self.session_state = None
 
@@ -41,8 +55,6 @@ class EnhancedSandbox:
         Returns:
             Dictionary with stdout, stderr, files, and execution metadata
         """
-        # Don't wrap the code - let the user control file saving
-        # This avoids duplicate image generation
         try:
             result = await self.sandbox.execute(code)
         except Exception as e:
@@ -56,30 +68,26 @@ class EnhancedSandbox:
                 "data": {},
             }
 
-        # Extract list of created files from the new files API
-        files = []
-        files_data = {}
+        # Get files from the sandbox's virtual filesystem
+        files: list[str] = []
+        files_data: dict[str, str] = {}
 
-        # Use the new files attribute from the sandbox result
+        # The PyodideSandbox result should have a files attribute with the virtual filesystem
         if hasattr(result, "files") and result.files:
+            import base64
+
             for filepath, content in result.files.items():
-                files.append(filepath)
-                # Store the raw bytes directly
-                files_data[filepath] = content
-
-        # Also extract any file paths mentioned in stdout for backwards compatibility
-        if result.stdout:
-            import re
-
-            # Extract file paths from "Saved plot to /path/to/file.png" messages
-            path_matches = re.findall(r"Saved plot to (/[^\s]+)", result.stdout)
-            for path in path_matches:
-                if path not in files and hasattr(result, "get_file"):
-                    # Try to get the file using the new API
-                    file_content = result.get_file(path)
-                    if file_content:
-                        files.append(path)
-                        files_data[path] = file_content
+                # Only track image files
+                if any(
+                    filepath.endswith(ext)
+                    for ext in [".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp", ".webp"]
+                ):
+                    files.append(filepath)
+                    # Content should already be base64 encoded from sandbox
+                    if isinstance(content, bytes):
+                        files_data[filepath] = base64.b64encode(content).decode("utf-8")
+                    else:
+                        files_data[filepath] = content
 
         return {
             "success": result.status == "success",
@@ -87,7 +95,7 @@ class EnhancedSandbox:
             "stdout": result.stdout or "",
             "stderr": result.stderr or "",
             "files": files,
-            "files_data": files_data,  # Include actual file data
+            "files_data": files_data,  # Include actual file data from virtual filesystem
             "tables": [],
             "data": {},
         }
@@ -98,7 +106,23 @@ class EnhancedSandbox:
 
         # Create new sandbox in a thread to avoid blocking
         def create_new_sandbox() -> PyodideSandbox:
-            return PyodideSandbox(stateful=True, allow_net=False)
+            # Need to allow read/write access to Deno cache directory for pyodide files
+            return PyodideSandbox(
+                stateful=False,  # Disabled to avoid dill installation issue
+                allow_net=False,
+                allow_read=[
+                    "/app/node_modules",
+                    "/app/node_modules/.deno",  # Deno cache directory
+                    "/opt/langchain_sandbox",
+                ],
+                allow_write=[
+                    "/app/node_modules",
+                    "/app/node_modules/.deno",  # Deno needs write for cache
+                    "/tmp",
+                ],  # Deno needs to write to entire node_modules for cache
+                return_files=True,  # IMPORTANT: Return files from virtual filesystem
+                file_paths=["/tmp", "/sandbox", "."],  # Paths to check for files
+            )
 
         self.sandbox = await asyncio.to_thread(create_new_sandbox)
         self.session_state = None

@@ -33,26 +33,37 @@ RUN pip install --no-cache-dir uv && \
 # Install langgraph-cli
 RUN uv pip install --system "langgraph-cli[inmem]"
 
+# Install Postgres checkpointer for LangGraph persistence
+RUN uv pip install --system "langgraph-checkpoint-postgres" && \
+    uv pip install --system "langgraph-checkpoint" && \
+    uv pip install --system "psycopg[binary,pool]"
+
 # Verify langchain-sandbox is from GitHub (version should be 0.0.7+, not 0.0.1 from PyPI)
 RUN python -c "import langchain_sandbox; import sys; version = getattr(langchain_sandbox, '__version__', 'unknown'); print(f'langchain-sandbox version: {version}'); sys.exit(1 if version == '0.0.1' else 0)" && \
     echo "✅ langchain-sandbox correctly installed from GitHub"
 
 # Download and prepare TypeScript source from GitHub to avoid JSR dependencies
-RUN mkdir -p /tmp/langchain-sandbox-ts && \
-    curl -s -o /tmp/langchain-sandbox-ts/pyodide_sandbox.ts \
+# Use /opt for permanent storage (not /tmp which might be cleared)
+RUN mkdir -p /opt/langchain_sandbox && \
+    curl -s -o /opt/langchain_sandbox/pyodide_sandbox.ts \
     https://raw.githubusercontent.com/johannhartmann/langchain-sandbox/main/libs/pyodide-sandbox-js/main.ts && \
     # Replace JSR imports with Deno.land URLs
     sed -i 's|import { join } from "@std/path";|import { join } from "https://deno.land/std@0.224.0/path/mod.ts";|' \
-        /tmp/langchain-sandbox-ts/pyodide_sandbox.ts && \
+        /opt/langchain_sandbox/pyodide_sandbox.ts && \
     sed -i 's|import { parseArgs } from "@std/cli/parse-args";|import { parseArgs } from "https://deno.land/std@0.224.0/cli/parse_args.ts";|' \
-        /tmp/langchain-sandbox-ts/pyodide_sandbox.ts && \
+        /opt/langchain_sandbox/pyodide_sandbox.ts && \
     # Fix pyodide import
     sed -i 's|import { loadPyodide } from "pyodide";|import { loadPyodide } from "npm:pyodide@0.26.4";|' \
-        /tmp/langchain-sandbox-ts/pyodide_sandbox.ts && \
+        /opt/langchain_sandbox/pyodide_sandbox.ts && \
+    # Set proper permissions
+    chmod 644 /opt/langchain_sandbox/pyodide_sandbox.ts && \
     echo "✅ TypeScript source prepared from GitHub"
 
-# Set environment variable to use our prepared TypeScript source
-ENV LANGCHAIN_SANDBOX_TS_SOURCE=/tmp/langchain-sandbox-ts/pyodide_sandbox.ts
+# Set environment variable that pyodide.py expects (LANGCHAIN_SANDBOX_TS_PATH not TS_SOURCE)
+ENV LANGCHAIN_SANDBOX_TS_PATH=/opt/langchain_sandbox/pyodide_sandbox.ts
+
+# Verify the TypeScript file is accessible
+RUN test -s /opt/langchain_sandbox/pyodide_sandbox.ts || exit 1
 
 # Expose ports for both servers
 EXPOSE 2024 8001
