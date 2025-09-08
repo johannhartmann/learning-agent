@@ -44,12 +44,9 @@ def _parse_allowed_domains(raw: str | None) -> list[str] | None:
 
 def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when available
     try:
-        # Adapters and SDK: we'll open a stdio session and load tools
-        from langchain_mcp_adapters.tools import load_mcp_tools  # type: ignore[import-not-found]
-        from mcp import ClientSession  # type: ignore[import-not-found]
-        from mcp.client.stdio import (  # type: ignore[import-not-found]
-            StdioServerParameters,
-            stdio_client,
+        # Use adapters client that creates a fresh session per tool invocation
+        from langchain_mcp_adapters.client import (
+            MultiServerMCPClient,  # type: ignore[import-not-found]
         )
     except Exception as e:  # pragma: no cover - optional dependency path
         print(f"MCP browser tools unavailable (missing adapters): {e}")
@@ -93,13 +90,15 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
         args = ["-m", "learning_agent.mcp.servers.browser_use_stdioserver"]
 
     try:
-        params = StdioServerParameters(command=command, args=args, env=server_env)
+        # Build client config for stdio server
+        server_cfg: dict[str, Any] = {"command": command, "args": args, "transport": "stdio"}
+        if server_env:
+            server_cfg["env"] = server_env
 
         async def _load() -> list[Any]:
-            async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
-                await session.initialize()
-                tools = await load_mcp_tools(session)
-                return list(tools)
+            client = MultiServerMCPClient({"browser": server_cfg})
+            tools = await client.get_tools()
+            return list(tools)
 
         # Synchronously load tools at startup time.
         # Use a dedicated thread + event loop to avoid conflicts with any running loop.
