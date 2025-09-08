@@ -59,6 +59,9 @@ export function useChat(
     defaultHeaders: {
       "x-auth-scheme": "langsmith",
     },
+    // Ensure we receive incremental state + message updates, including from subgraphs
+    streamMode: ["values", "messages", "updates"],
+    streamSubgraphs: true,
   });
 
   const sendMessage = useCallback(
