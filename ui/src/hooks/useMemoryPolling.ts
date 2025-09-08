@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { getInternalApiBase } from '@/lib/environment/api';
 import type { Memory, Pattern, ExecutionData } from '@/app/types/types';
 
 interface MemoriesResponse {
@@ -18,8 +19,8 @@ export function useMemoryPolling(intervalMs: number = 5000) {
     try {
       setIsLoading(true);
       setError(null);
-      
-      const response = await fetch('http://localhost:8001/api/memories');
+      const base = getInternalApiBase();
+      const response = await fetch(`${base}/api/memories`);
       if (!response.ok) {
         throw new Error(`Failed to fetch memories: ${response.statusText}`);
       }

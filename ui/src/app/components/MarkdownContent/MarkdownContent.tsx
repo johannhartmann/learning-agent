@@ -8,6 +8,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import type { PrismTheme } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import styles from "./MarkdownContent.module.scss";
+import { getInternalApiBase } from "@/lib/environment/api";
 
 interface MarkdownContentProps {
   content: string;
@@ -45,9 +46,10 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
             img({ src, alt }: { src?: string; alt?: string }) {
               // Normalize various image references from sandbox/tool output
               const toApiUrl = (filePath: string) => {
+                const base = getInternalApiBase();
                 const path = filePath.startsWith("/") ? filePath : `/${filePath}`;
                 const q = threadId ? `?thread_id=${threadId}` : "";
-                return `http://localhost:8001/api/files${path}${q}`;
+                return `${base}/api/files${path}${q}`;
               };
 
               let actualSrc: string | undefined = src;

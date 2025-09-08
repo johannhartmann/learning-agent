@@ -16,6 +16,7 @@ import { FileViewer } from "../FileViewer/FileViewer";
 import styles from "./ToolCallBox.module.scss";
 import Image from "next/image";
 import { ToolCall } from "../../types/types";
+import { getInternalApiBase } from "@/lib/environment/api";
 
 interface ToolCallBoxProps {
   toolCall: ToolCall;
@@ -161,12 +162,13 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(({ toolCall, threadId })
                   
                   if (isImage) {
                     // Display images inline directly
+                    const base = getInternalApiBase();
                     return (
                       <div key={filePath} className={styles.fileItem}>
                         <div className={styles.imageContainer}>
                           <p className={styles.fileName}>{filePath.split("/").pop()}</p>
                           <Image 
-                            src={`http://localhost:8001/api/files${filePath}${threadId ? `?thread_id=${threadId}` : ''}`}
+                            src={`${base}/api/files${filePath}${threadId ? `?thread_id=${threadId}` : ''}`}
                             alt={filePath.split("/").pop() || "Generated file"}
                             className={styles.inlineImage}
                             style={{ maxWidth: '100%', height: 'auto' }}
