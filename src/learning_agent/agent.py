@@ -1,5 +1,6 @@
 """Main learning agent using deepagents framework."""
 
+import logging
 from pathlib import Path
 
 from deepagents import create_deep_agent
@@ -11,6 +12,9 @@ from learning_agent.providers import get_chat_model
 from learning_agent.state import LearningAgentState
 from learning_agent.subagents import LEARNING_SUBAGENTS
 from learning_agent.tools.sandbox_tool import create_sandbox_tool
+
+
+logger = logging.getLogger(__name__)
 
 
 # Main system prompt for the learning agent
@@ -50,6 +54,14 @@ You can delegate work to specialized sub-agents using the `task` tool:
 - **execution-specialist**: Execute complex tasks with parallel orchestration
 - **reflection-analyst**: Perform deep reflection on completed tasks
 - **planning-strategist**: Create strategic plans incorporating learned patterns
+
+## Agent-to-Agent Communication (A2A)
+You can communicate with other agents using the `send_a2a_message` tool:
+- Use this to collaborate with specialized agents for specific domains
+- Send clear, context-rich messages with specific requests
+- Include relevant state information when needed
+- Wait for responses before proceeding with dependent tasks
+- Example: send_a2a_message(agent_name="data-analyst", message="Analyze this dataset for patterns: ...")
 
 ## Deep Learning Workflow
 For each task you should:
@@ -179,10 +191,22 @@ def create_learning_agent(
     # Create sandbox tool
     sandbox_tool = create_sandbox_tool()
 
+    # Import A2A tool if enabled
+    a2a_tools = []
+    if settings.enable_a2a:
+        try:
+            from learning_agent.tools.a2a_tool import send_a2a_message
+
+            a2a_tools = [send_a2a_message]
+            logger.info("A2A communication enabled")
+        except ImportError:
+            logger.warning("Could not import A2A tool, A2A communication disabled")
+
     # Combine with deepagents built-in tools
     all_tools = [
         *learning_tools,  # Learning-specific tools
         sandbox_tool,  # Python sandbox for safe code execution
+        *a2a_tools,  # Agent-to-Agent communication (if enabled)
         write_todos,  # Planning and task tracking
         ls,  # List directory contents
         read_file,  # Read file contents

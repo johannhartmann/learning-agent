@@ -31,14 +31,14 @@ class TestSandboxConfiguration:
 
             # Should NOT have JSR imports
             assert "jsr:" not in content, "TypeScript should not use JSR imports"
-            assert (
-                "@std/" not in content or "deno.land/std" in content
-            ), "Should use Deno.land URLs, not @std shortcuts"
+            assert "@std/" not in content or "deno.land/std" in content, (
+                "Should use Deno.land URLs, not @std shortcuts"
+            )
 
             # Should have correct imports
-            assert (
-                "deno.land/std" in content or "npm:pyodide" in content
-            ), "Should use Deno.land or npm imports"
+            assert "deno.land/std" in content or "npm:pyodide" in content, (
+                "Should use Deno.land or npm imports"
+            )
 
     def test_patch_pyodide_sandbox(self):
         """Test that patching PyodideSandbox changes PKG_NAME."""
@@ -124,9 +124,9 @@ class TestSandboxConfiguration:
         from langchain_sandbox import pyodide
 
         # Check patch was applied
-        assert (
-            "jsr:" not in pyodide.PKG_NAME
-        ), f"Sandbox tool should patch away JSR, but got: {pyodide.PKG_NAME}"
+        assert "jsr:" not in pyodide.PKG_NAME, (
+            f"Sandbox tool should patch away JSR, but got: {pyodide.PKG_NAME}"
+        )
 
 
 if __name__ == "__main__":

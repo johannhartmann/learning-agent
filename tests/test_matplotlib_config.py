@@ -22,9 +22,9 @@ class TestMatplotlibConfiguration:
         assert version != "0.0.1", "Should not be using PyPI version 0.0.1"
 
         # Should be 0.0.6+ or unknown (from GitHub)
-        assert (
-            version in ["unknown", "0.0.6", "0.0.7"] or version > "0.0.6"
-        ), f"Unexpected version: {version}"
+        assert version in ["unknown", "0.0.6", "0.0.7"] or version > "0.0.6", (
+            f"Unexpected version: {version}"
+        )
 
     def test_sandbox_tool_import(self):
         """Test that sandbox tool can be imported and configured."""
@@ -52,9 +52,9 @@ class TestMatplotlibConfiguration:
         assert "jsr:" not in pkg_name, f"Should not use JSR, got: {pkg_name}"
 
         # Should be a file or URL
-        assert pkg_name.endswith(".ts") or pkg_name.startswith(
-            "http"
-        ), f"Unexpected package source: {pkg_name}"
+        assert pkg_name.endswith(".ts") or pkg_name.startswith("http"), (
+            f"Unexpected package source: {pkg_name}"
+        )
 
     @pytest.mark.docker
     def test_docker_environment_variables(self):
@@ -97,9 +97,9 @@ class TestMatplotlibConfiguration:
 
         # Check the state has the error history field
         state_annotations = LearningAgentState.__annotations__
-        assert (
-            "sandbox_error_history" in state_annotations
-        ), "State should have sandbox_error_history field"
+        assert "sandbox_error_history" in state_annotations, (
+            "State should have sandbox_error_history field"
+        )
 
     @pytest.mark.integration
     def test_docker_compose_config(self):

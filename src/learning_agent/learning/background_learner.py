@@ -38,7 +38,7 @@ class BackgroundLearner:
         )
 
         # Queue for postponed learning tasks
-        self.learning_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        self.learning_queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
         self.background_task: asyncio.Task[None] | None = None
 
         # Quick access cache for recent memories

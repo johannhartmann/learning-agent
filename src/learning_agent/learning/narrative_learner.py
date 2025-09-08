@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Protocol, cast
 from uuid import uuid4
 
 import faiss
@@ -14,15 +14,21 @@ from langmem import create_memory_manager
 from pydantic import BaseModel, Field
 
 
+class TraceableProto(Protocol):
+    def __call__(self, **kwargs: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:  # noqa: D401
+        """A decorator factory used for tracing functions."""
+
 try:
-    from langsmith import traceable
-except ImportError:
+    from langsmith import traceable as _traceable_import
+    traceable = cast(Any, _traceable_import)
+except ImportError:  # pragma: no cover - optional dependency
     # Fallback if langsmith is not installed
-    def traceable(**kwargs: Any) -> Any:  # noqa: ARG001
-        def decorator(func: Any) -> Any:
+    def _fallback_traceable(**kwargs: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:  # noqa: ARG001
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             return func
 
         return decorator
+    traceable = cast(Any, _fallback_traceable)
 
 
 from learning_agent.config import settings
@@ -191,8 +197,12 @@ Write a narrative memory of this experience. Include:
 Write this as a story I'm telling my future self - conversational, insightful, and honest about what happened."""
 
         structured_llm = self.llm.with_structured_output(NarrativeMemory)
-        config = {"callbacks": callbacks} if callbacks else {}
-        narrative_response = await structured_llm.ainvoke(narrative_prompt, config=config)
+        from langchain_core.runnables import RunnableConfig
+
+        config: RunnableConfig | None = {"callbacks": callbacks} if callbacks else None
+        narrative_response = await structured_llm.ainvoke(
+            narrative_prompt, config=config
+        )
         if isinstance(narrative_response, NarrativeMemory):
             narrative = narrative_response.narrative
         else:

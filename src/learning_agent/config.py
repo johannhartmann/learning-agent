@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     max_parallel_agents: int = Field(10, description="Maximum parallel sub-agents")
     enable_learning: bool = Field(True, description="Enable learning system")
 
+    # A2A Configuration
+    langgraph_url: str = Field("http://localhost:8000", description="LangGraph server URL for A2A")
+    enable_a2a: bool = Field(True, description="Enable Agent-to-Agent communication")
+    a2a_timeout_seconds: int = Field(30, description="A2A request timeout in seconds")
+
     # Performance Configuration
     task_timeout_seconds: int = Field(300, description="Task execution timeout")
     checkpoint_interval_seconds: int = Field(60, description="Checkpoint interval")

@@ -157,7 +157,7 @@ async def get_file(file_path: str, thread_id: str | None = None) -> Response:
     import base64
 
     try:
-        import httpx  # type: ignore[import-not-found]
+        import httpx
     except ImportError:
         httpx = None  # type: ignore[assignment]
 

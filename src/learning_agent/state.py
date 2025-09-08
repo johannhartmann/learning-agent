@@ -1,6 +1,7 @@
 """Learning Agent state schema extending DeepAgentState."""
 
-from typing import Any, Literal, NotRequired
+import operator
+from typing import Annotated, Any, Literal, NotRequired
 
 from deepagents import DeepAgentState
 from pydantic import BaseModel
@@ -34,7 +35,8 @@ class LearningAgentState(DeepAgentState):  # type: ignore[misc]
     relevant_learnings: NotRequired[list[str]]  # type: ignore[valid-type]
 
     # Track recent sandbox execution errors to avoid repeating failures
-    sandbox_error_history: NotRequired[list[dict[str, str]]]  # type: ignore[valid-type]
+    # Use Annotated with operator.add to handle concurrent updates
+    sandbox_error_history: NotRequired[Annotated[list[dict[str, str]], operator.add]]  # type: ignore[valid-type]
 
     # Store sandbox-generated files as base64-encoded data for session isolation
     files: NotRequired[dict[str, str]]  # type: ignore[valid-type]

@@ -52,8 +52,13 @@ RUN mkdir -p /tmp/langchain-sandbox-ts && \
         /tmp/langchain-sandbox-ts/pyodide_sandbox.ts && \
     echo "✅ TypeScript source prepared from GitHub"
 
-# Set environment variable to use our prepared TypeScript source
+# Set environment variables for sandbox TypeScript source
+# The library uses LANGCHAIN_SANDBOX_TS_PATH; tests also check TS_SOURCE
+ENV LANGCHAIN_SANDBOX_TS_PATH=/tmp/langchain-sandbox-ts/pyodide_sandbox.ts
 ENV LANGCHAIN_SANDBOX_TS_SOURCE=/tmp/langchain-sandbox-ts/pyodide_sandbox.ts
+
+# Verify the TypeScript file is accessible in the image
+RUN test -s /tmp/langchain-sandbox-ts/pyodide_sandbox.ts || exit 1
 
 # Set environment variables for testing
 ENV PYTHONUNBUFFERED=1

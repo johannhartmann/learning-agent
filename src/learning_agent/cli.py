@@ -79,7 +79,7 @@ async def execute_task(task: str) -> None:
 
         try:
             # Initialize agent directly
-            agent = create_learning_agent()  # type: ignore[var-annotated]  # type: ignore[var-annotated]
+            agent: Any = create_learning_agent()
 
             # Create progress callback (unused but kept for compatibility)
             async def update_progress(message: str) -> None:
@@ -90,7 +90,7 @@ async def execute_task(task: str) -> None:
             # Process the task with agent
             console.print(f"\n[bold]Task:[/bold] {task}\n")
             state = {"messages": [{"role": "user", "content": task}]}
-            result = await agent.ainvoke(state)  # type: ignore[attr-defined]
+            result = await agent.ainvoke(state)
 
             # Display results
             display_results(result)
@@ -111,7 +111,7 @@ async def interactive_mode() -> None:
         )
     )
 
-    agent = create_learning_agent()  # type: ignore[var-annotated]
+    agent: Any = create_learning_agent()
 
     while True:
         try:
@@ -147,7 +147,7 @@ async def interactive_mode() -> None:
                 progress.add_task("Thinking...", total=None)
 
                 state = {"messages": [{"role": "user", "content": user_input}]}
-                result = await agent.ainvoke(state)  # type: ignore[attr-defined]
+                result = await agent.ainvoke(state)
 
             # Display results
             display_results(result)

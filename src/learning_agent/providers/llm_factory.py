@@ -1,6 +1,6 @@
 """Factory for creating provider-agnostic chat models."""
 
-from typing import Any
+from typing import Any, cast
 
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
@@ -70,8 +70,13 @@ def get_chat_model(config: Any) -> BaseChatModel:
 
     # Initialize the chat model using LangChain's factory
     try:
-        model = init_chat_model(
-            model=config.llm_model, model_provider=config.llm_provider, **model_kwargs
+        model = cast(
+            BaseChatModel,
+            init_chat_model(
+                model=config.llm_model,
+                model_provider=config.llm_provider,
+                **model_kwargs,
+            ),
         )
     except Exception as e:
         # Fallback to OpenAI if provider fails

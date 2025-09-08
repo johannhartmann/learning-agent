@@ -27,8 +27,8 @@ class EnhancedSandbox:
         # Enable sandbox with network access control
         # Need to allow read/write access to Deno cache directory for pyodide files
         # Note: stateful=False to avoid dill dependency which isn't available in Pyodide
-        self.sandbox = PyodideSandbox(
-            stateful=False,  # Disabled to avoid dill installation issue
+        self.sandbox = PyodideSandbox(  # type: ignore[call-arg]
+            stateful=True,
             allow_net=allow_network,
             allow_read=[
                 "/app/node_modules",
@@ -39,10 +39,10 @@ class EnhancedSandbox:
             allow_write=[
                 "/app/node_modules",
                 "/app/node_modules/.deno",  # Deno needs write for cache
-                "/tmp",  # Also allow writing to /tmp for files
+                "/tmp",  # nosec B108 - Safe in isolated sandbox environment
             ],  # Deno needs to write to entire node_modules for cache
             return_files=True,  # IMPORTANT: Return files from virtual filesystem
-            file_paths=["/tmp", "/sandbox", "."],  # Paths to check for files
+            file_paths=["/tmp", "/sandbox", "."],  # nosec B108 - Safe in isolated sandbox environment
         )
         self.session_state = None
 
@@ -83,11 +83,8 @@ class EnhancedSandbox:
                     for ext in [".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp", ".webp"]
                 ):
                     files.append(filepath)
-                    # Content should already be base64 encoded from sandbox
-                    if isinstance(content, bytes):
-                        files_data[filepath] = base64.b64encode(content).decode("utf-8")
-                    else:
-                        files_data[filepath] = content
+                    # Content is always bytes from PyodideSandbox
+                    files_data[filepath] = base64.b64encode(content).decode("utf-8")
 
         return {
             "success": result.status == "success",
@@ -107,8 +104,8 @@ class EnhancedSandbox:
         # Create new sandbox in a thread to avoid blocking
         def create_new_sandbox() -> PyodideSandbox:
             # Need to allow read/write access to Deno cache directory for pyodide files
-            return PyodideSandbox(
-                stateful=False,  # Disabled to avoid dill installation issue
+            return PyodideSandbox(  # type: ignore[call-arg]
+                stateful=True,
                 allow_net=False,
                 allow_read=[
                     "/app/node_modules",
@@ -118,10 +115,10 @@ class EnhancedSandbox:
                 allow_write=[
                     "/app/node_modules",
                     "/app/node_modules/.deno",  # Deno needs write for cache
-                    "/tmp",
+                    "/tmp",  # nosec B108
                 ],  # Deno needs to write to entire node_modules for cache
                 return_files=True,  # IMPORTANT: Return files from virtual filesystem
-                file_paths=["/tmp", "/sandbox", "."],  # Paths to check for files
+                file_paths=["/tmp", "/sandbox", "."],  # Paths to check for files  # nosec B108
             )
 
         self.sandbox = await asyncio.to_thread(create_new_sandbox)

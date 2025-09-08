@@ -88,9 +88,9 @@ class TestDockerMatplotlibIntegration:
 
         # Check that execution was successful
         if isinstance(result, dict):
-            assert (
-                result.get("success") is True
-            ), f"Sandbox execution failed: {result.get('stderr')}"
+            assert result.get("success") is True, (
+                f"Sandbox execution failed: {result.get('stderr')}"
+            )
             assert "Plot created successfully" in result.get("stdout", "")
             # Should NOT have matplotlib.pyplot import errors
             assert "No module named 'matplotlib.pyplot'" not in result.get("stderr", "")
