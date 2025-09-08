@@ -74,10 +74,13 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
                 }
               }
 
+              if (!actualSrc) {
+                return null;
+              }
               return (
                 <div className={styles.imageWrapper}>
                   <Image
-                    src={actualSrc || ""}
+                    src={actualSrc}
                     alt={alt || "Image"}
                     className={styles.figure}
                     style={{ maxWidth: "100%", height: "auto" }}
