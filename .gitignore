@@ -124,7 +124,8 @@ credentials/
 
 # Claude
 CLAUDE.md
-ui/
+# Track UI source; ignore build artifacts only
+ui/.next/
 
 node_modules/
 .playwright-mcp/
