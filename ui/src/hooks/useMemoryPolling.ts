@@ -20,7 +20,7 @@ export function useMemoryPolling(intervalMs: number = 5000) {
       setIsLoading(true);
       setError(null);
       const base = getInternalApiBase();
-      const response = await fetch(`${base}/api/memories`);
+      const response = await fetch(`${base}/memories`);
       if (!response.ok) {
         throw new Error(`Failed to fetch memories: ${response.statusText}`);
       }

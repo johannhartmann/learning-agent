@@ -168,7 +168,7 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(({ toolCall, threadId })
                         <div className={styles.imageContainer}>
                           <p className={styles.fileName}>{filePath.split("/").pop()}</p>
                           <Image 
-                            src={`${base}/api/files${filePath}${threadId ? `?thread_id=${threadId}` : ''}`}
+                            src={`${base}/files${filePath}${threadId ? `?thread_id=${threadId}` : ''}`}
                             alt={filePath.split("/").pop() || "Generated file"}
                             className={styles.inlineImage}
                             style={{ maxWidth: '100%', height: 'auto' }}

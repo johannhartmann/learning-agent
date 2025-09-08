@@ -49,7 +49,7 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
                 const base = getInternalApiBase();
                 const path = filePath.startsWith("/") ? filePath : `/${filePath}`;
                 const q = threadId ? `?thread_id=${threadId}` : "";
-                return `${base}/api/files${path}${q}`;
+                return `${base}/files${path}${q}`;
               };
 
               let actualSrc: string | undefined = src;
