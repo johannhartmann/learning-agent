@@ -44,6 +44,10 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
               return <div className={styles.preWrapper}>{children}</div>;
             },
             img({ src, alt }: { src?: string; alt?: string }) {
+              // Skip images with missing/empty src from LLM outputs
+              if (!src || src.trim() === "") {
+                return null;
+              }
               // Normalize various image references from sandbox/tool output
               const toApiUrl = (filePath: string) => {
                 const base = getInternalApiBase();
@@ -70,6 +74,7 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
                   actualSrc = toApiUrl(src);
                 } else if (!/^https?:\/\//i.test(src)) {
                   // Relative filename from sandbox output (e.g., foo.png or tmp/foo.png)
+                  if (src.trim() === "") return null;
                   actualSrc = toApiUrl(src);
                 }
               }
