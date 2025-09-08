@@ -28,7 +28,8 @@ COPY constraints.txt .
 
 # Install Python dependencies with constraints to ensure GitHub source
 RUN pip install --no-cache-dir uv && \
-    uv pip install --system --constraint constraints.txt .
+    uv pip install --system --constraint constraints.txt .[browser] && \
+    python -m playwright install --with-deps chromium
 
 # Install langgraph CLI and API to serve graphs in-process
 RUN uv pip install --system "langgraph-cli[inmem]" && \

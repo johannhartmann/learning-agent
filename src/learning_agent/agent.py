@@ -11,6 +11,7 @@ from learning_agent.learning.tools import create_learning_tools
 from learning_agent.providers import get_chat_model
 from learning_agent.state import LearningAgentState
 from learning_agent.subagents import LEARNING_SUBAGENTS
+from learning_agent.tools.mcp_browser import create_mcp_browser_tools
 from learning_agent.tools.sandbox_tool import create_sandbox_tool
 
 
@@ -213,6 +214,15 @@ def create_learning_agent(
         write_file,  # Write files
         edit_file,  # Edit existing files
     ]
+
+    # Optionally add MCP browser-use tools (behind ENABLE_MCP_BROWSER flag)
+    try:
+        mcp_browser_tools = create_mcp_browser_tools()
+        if mcp_browser_tools:
+            all_tools.extend(mcp_browser_tools)
+            logger.info("MCP browser tools enabled")
+    except Exception as e:  # pragma: no cover - optional path
+        logger.warning(f"MCP browser tools unavailable: {e}")
 
     # Create the agent
     agent = create_deep_agent(

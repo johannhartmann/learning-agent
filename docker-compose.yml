@@ -27,6 +27,7 @@ services:
     container_name: learning-agent-server
     ports:
       - "2024:2024"
+    shm_size: 1gb
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -40,8 +41,17 @@ services:
       - LANGGRAPH_RUNTIME_EDITION=inmem
       - REDIS_URI=memory://
       - BG_JOB_ISOLATED_LOOPS=true
+      - BROWSER_HEADLESS=${BROWSER_HEADLESS:-true}
+      - BROWSER_ALLOWED_DOMAINS=${BROWSER_ALLOWED_DOMAINS:-}
+      - BROWSER_CDP_URL=${BROWSER_CDP_URL:-}
+      - BROWSER_KEEP_ALIVE=${BROWSER_KEEP_ALIVE:-false}
+      - BROWSER_MIN_WAIT=${BROWSER_MIN_WAIT:-0.25}
+      - BROWSER_WAIT_BETWEEN=${BROWSER_WAIT_BETWEEN:-0.5}
+      - BROWSER_VIEWPORT_WIDTH=${BROWSER_VIEWPORT_WIDTH:-1280}
+      - BROWSER_VIEWPORT_HEIGHT=${BROWSER_VIEWPORT_HEIGHT:-720}
     volumes:
       - ./.agent:/app/.agent
+      - playwright_cache:/root/.cache/ms-playwright
     networks:
       - learning-agent-network
     depends_on:
@@ -103,3 +113,4 @@ networks:
 volumes:
   agent-data:
   postgres_data:
+  playwright_cache:

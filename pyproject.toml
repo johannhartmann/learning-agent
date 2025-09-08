@@ -83,6 +83,13 @@ test = [
     "pytest-mock>=3.12.0",
 ]
 
+browser = [
+    "browser-use>=0.1.0",
+    "playwright>=1.47.0",
+    "mcp>=1.0.0",
+    "langchain-mcp>=0.1.2",
+]
+
 docs = [
     "mkdocs>=1.5.3",
     "mkdocs-material>=9.5.0",
@@ -206,6 +213,8 @@ module = [
     "starlette",
     "starlette.*",
     "uvicorn",
+    "httpx",
+    "httpx.*",
     "typer",
     "rich.*",
     "dotenv",
