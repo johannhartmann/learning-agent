@@ -118,6 +118,7 @@ export default function HomePage() {
           onSelectSubAgent={setSelectedSubAgent}
           onTodosUpdate={setTodos}
           onFilesUpdate={setFiles}
+          files={files}
           onNewThread={handleNewThread}
           isLoadingThreadState={isLoadingThreadState}
         />

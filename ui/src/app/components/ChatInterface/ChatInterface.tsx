@@ -29,6 +29,7 @@ interface ChatInterfaceProps {
   onSelectSubAgent: (subAgent: SubAgent) => void;
   onTodosUpdate: (todos: TodoItem[]) => void;
   onFilesUpdate: (files: Record<string, string>) => void;
+  files: Record<string, string>;
   onNewThread: () => void;
   isLoadingThreadState: boolean;
 }
@@ -42,6 +43,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(
     onTodosUpdate,
     onFilesUpdate,
     onNewThread,
+    files,
     isLoadingThreadState,
   }) => {
     const [input, setInput] = useState("");
@@ -266,6 +268,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(
                   onSelectSubAgent={onSelectSubAgent}
                   selectedSubAgent={selectedSubAgent}
                   threadId={threadId}
+                  filesFromState={files}
                 />
               ))}
               {isLoading && (

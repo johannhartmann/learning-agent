@@ -17,16 +17,23 @@ interface ChatMessageProps {
   onSelectSubAgent: (subAgent: SubAgent) => void;
   selectedSubAgent: SubAgent | null;
   threadId: string | null;
+  filesFromState?: Record<string, string>;
 }
 
 export const ChatMessage = React.memo<ChatMessageProps>(
-  ({ message, toolCalls, showAvatar, onSelectSubAgent, selectedSubAgent, threadId }) => {
+  ({ message, toolCalls, showAvatar, onSelectSubAgent, selectedSubAgent, threadId, filesFromState }) => {
     const isUser = message.type === "human";
     const messageContent = extractStringFromMessageContent(message);
     const hasContent = messageContent && messageContent.trim() !== "";
     const hasToolCalls = toolCalls.length > 0;
 
     const fallbackImages = useMemo(() => {
+      // Prefer explicit file list from state when available
+      const fromState = filesFromState
+        ? Object.keys(filesFromState).filter((p) => /\.(png|jpe?g|gif|svg|webp|bmp)$/i.test(p))
+        : [];
+      if (fromState.length > 0) return Array.from(new Set(fromState));
+
       const files: string[] = [];
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.name === "python_sandbox" && tc.result) {
@@ -49,7 +56,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
       });
       // De-duplicate
       return Array.from(new Set(files));
-    }, [toolCalls]);
+    }, [toolCalls, filesFromState]);
     
     // Removed visualization extraction - images are displayed in ToolCallBox
     const subAgents = useMemo(() => {
