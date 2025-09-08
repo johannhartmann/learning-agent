@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 from learning_agent.learning.langmem_integration import get_learning_system
@@ -141,6 +141,26 @@ async def get_memories() -> MemoriesResponse:
 async def health_check() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.get("/api/testpage")
+async def test_page() -> HTMLResponse:
+    """Serve a simple deterministic HTML page for browser integration tests."""
+    html = """
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>MCP Browser Test Page</title>
+      </head>
+      <body>
+        <h1 id="title">MCP Browser Test Page</h1>
+        <p id="content">Hello from the internal API server.</p>
+        <a id="link" href="/api/testpage">Self link</a>
+      </body>
+    </html>
+    """
+    return HTMLResponse(content=html, status_code=200)
 
 
 @app.get("/api/files/{file_path:path}")

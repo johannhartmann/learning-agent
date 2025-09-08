@@ -105,6 +105,31 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      server:
+        condition: service_healthy
+
+  # UI End-to-end tests using Microsoft Playwright container
+  ui-test:
+    image: mcr.microsoft/playwright:v1.47.0-jammy
+    container_name: learning-agent-ui-test
+    working_dir: /app/ui
+    entrypoint: ["/bin/bash", "-lc"]
+    command: >
+      "npm ci && npx playwright install chromium && npx playwright test --reporter=list"
+    environment:
+      - NEXT_PUBLIC_DEPLOYMENT_URL=http://server:2024
+      - NEXT_PUBLIC_AGENT_ID=learning_agent
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CI=true
+    volumes:
+      - ./ui:/app/ui
+    depends_on:
+      ui:
+        condition: service_started
+      server:
+        condition: service_healthy
+    networks:
+      - learning-agent-network
 
 networks:
   learning-agent-network:
