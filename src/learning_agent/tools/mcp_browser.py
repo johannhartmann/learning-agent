@@ -101,16 +101,27 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
                 tools = await load_mcp_tools(session)
                 return list(tools)
 
-        # Synchronously load tools at startup time
-        try:
-            return asyncio.run(_load())
-        except RuntimeError:
-            # In case there's an active loop (unlikely at import time), create a new one
-            loop = asyncio.new_event_loop()
+        # Synchronously load tools at startup time.
+        # Use a dedicated thread + event loop to avoid conflicts with any running loop.
+        from threading import Thread
+
+        result: list[list[Any]] = []
+        exc: list[BaseException] = []
+
+        def _runner() -> None:
             try:
-                return loop.run_until_complete(_load())
-            finally:
-                loop.close()
+                res = asyncio.run(_load())
+                result.append(res)
+            except BaseException as e:
+                exc.append(e)
+
+        t = Thread(target=_runner, daemon=True)
+        t.start()
+        t.join()
+        if exc:
+            print(f"Failed to load MCP tools in thread: {exc[0]}")
+            return []
+        return result[0] if result else []
     except Exception as e:  # pragma: no cover - runtime issues
         print(f"Failed to initialize browser MCP tools: {e}")
         return []
