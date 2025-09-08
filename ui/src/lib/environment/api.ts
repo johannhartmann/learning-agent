@@ -1,4 +1,9 @@
+// Client-side base path that proxies through Next.js
 export function getInternalApiBase() {
-  return process.env.NEXT_PUBLIC_INTERNAL_API_BASE || "http://127.0.0.1:8001";
+  return "/api/internal";
 }
 
+// Server-side upstream base (used inside Next route handlers)
+export function getInternalUpstreamBase() {
+  return process.env.INTERNAL_API_BASE || "http://server:8001";
+}
