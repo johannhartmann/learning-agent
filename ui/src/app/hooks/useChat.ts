@@ -36,6 +36,9 @@ export function useChat(
     (data: { [node: string]: Partial<StateType> }) => {
       for (const [, nodeData] of Object.entries(data)) {
         if (nodeData?.todos) {
+          // Debug: Log todo updates to help verify stream events include them
+          // eslint-disable-next-line no-console
+          console.debug("[stream] todos update", nodeData.todos);
           onTodosUpdate(nodeData.todos);
         }
         if (nodeData?.files) {
