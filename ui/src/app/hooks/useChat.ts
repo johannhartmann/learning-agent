@@ -37,8 +37,6 @@ export function useChat(
       for (const [, nodeData] of Object.entries(data)) {
         const values = (nodeData && typeof nodeData === "object") ? (nodeData.values || nodeData) : {};
         if (values?.todos) {
-          // eslint-disable-next-line no-console
-          console.debug("[stream] todos update", values.todos);
           onTodosUpdate(values.todos);
         }
         if (values?.files) {

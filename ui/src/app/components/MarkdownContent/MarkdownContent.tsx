@@ -55,18 +55,15 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
                 const q = threadId ? `?thread_id=${threadId}` : "";
                 const actual = `${base}/files${path}${q}`;
                 return (
-                  <div className={styles.imageWrapper}>
-                    <Image
-                      src={actual}
-                      alt={alt || "Image"}
-                      className={styles.figure}
-                      style={{ maxWidth: "100%", height: "auto" }}
-                      width={800}
-                      height={600}
-                      unoptimized
-                    />
-                    {alt && <p className={styles.imageCaption}>{alt}</p>}
-                  </div>
+                  <Image
+                    src={actual}
+                    alt={alt || "Image"}
+                    className={styles.figure}
+                    style={{ maxWidth: "100%", height: "auto" }}
+                    width={800}
+                    height={600}
+                    unoptimized
+                  />
                 );
               }
               // Normalize various image references from sandbox/tool output
@@ -104,18 +101,15 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
                 return null;
               }
               return (
-                <div className={styles.imageWrapper}>
-                  <Image
-                    src={actualSrc}
-                    alt={alt || "Image"}
-                    className={styles.figure}
-                    style={{ maxWidth: "100%", height: "auto" }}
-                    width={800}
-                    height={600}
-                    unoptimized
-                  />
-                  {alt && <p className={styles.imageCaption}>{alt}</p>}
-                </div>
+                <Image
+                  src={actualSrc}
+                  alt={alt || "Image"}
+                  className={styles.figure}
+                  style={{ maxWidth: "100%", height: "auto" }}
+                  width={800}
+                  height={600}
+                  unoptimized
+                />
               );
             },
             a({ href, children }: { href?: string; children?: React.ReactNode }) {
