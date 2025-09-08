@@ -14,10 +14,12 @@ interface MarkdownContentProps {
   content: string;
   className?: string;
   threadId?: string | null;
+  // Optional fallback image paths (e.g., from tool outputs) used if markdown image src is missing
+  fallbackImages?: string[];
 }
 
 export const MarkdownContent = React.memo<MarkdownContentProps>(
-  ({ content, className = "", threadId }) => {
+  ({ content, className = "", threadId, fallbackImages = [] }) => {
     return (
       <div className={`${styles.markdown} ${className}`}>
         <ReactMarkdown
@@ -44,9 +46,28 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
               return <div className={styles.preWrapper}>{children}</div>;
             },
             img({ src, alt }: { src?: string; alt?: string }) {
-              // Skip images with missing/empty src from LLM outputs
+              // Skip images with missing/empty src, unless we can fall back to a known generated file
               if (!src || src.trim() === "") {
-                return null;
+                const first = fallbackImages[0];
+                if (!first) return null;
+                const base = getInternalApiBase();
+                const path = first.startsWith("/") ? first : `/${first}`;
+                const q = threadId ? `?thread_id=${threadId}` : "";
+                const actual = `${base}/files${path}${q}`;
+                return (
+                  <div className={styles.imageWrapper}>
+                    <Image
+                      src={actual}
+                      alt={alt || "Image"}
+                      className={styles.figure}
+                      style={{ maxWidth: "100%", height: "auto" }}
+                      width={800}
+                      height={600}
+                      unoptimized
+                    />
+                    {alt && <p className={styles.imageCaption}>{alt}</p>}
+                  </div>
+                );
               }
               // Normalize various image references from sandbox/tool output
               const toApiUrl = (filePath: string) => {

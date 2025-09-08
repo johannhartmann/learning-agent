@@ -25,6 +25,31 @@ export const ChatMessage = React.memo<ChatMessageProps>(
     const messageContent = extractStringFromMessageContent(message);
     const hasContent = messageContent && messageContent.trim() !== "";
     const hasToolCalls = toolCalls.length > 0;
+
+    const fallbackImages = useMemo(() => {
+      const files: string[] = [];
+      toolCalls.forEach((tc: ToolCall) => {
+        if (tc.name === "python_sandbox" && tc.result) {
+          // Match patterns like: Saved plot to /tmp/foo.png
+          const saved = tc.result.match(/Saved\s+plot\s+to\s+(\/[^\s]+)/g);
+          if (saved) {
+            saved.forEach((m) => {
+              const mm = m.match(/Saved\s+plot\s+to\s+(\/[^\s]+)/);
+              if (mm && mm[1]) files.push(mm[1]);
+            });
+          }
+          // Extract any png/jpg/svg paths after a "Generated X file(s):" pattern
+          const genIdx = tc.result.indexOf("Generated ");
+          if (genIdx >= 0) {
+            const after = tc.result.slice(genIdx);
+            const list = after.match(/\/[\w\-\.\/]+\.(png|jpg|jpeg|gif|svg)/gi) || [];
+            list.forEach((p) => files.push(p));
+          }
+        }
+      });
+      // De-duplicate
+      return Array.from(new Set(files));
+    }, [toolCalls]);
     
     // Removed visualization extraction - images are displayed in ToolCallBox
     const subAgents = useMemo(() => {
@@ -83,7 +108,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
               {isUser ? (
                 <p className={styles.text}>{messageContent}</p>
               ) : (
-                <MarkdownContent content={messageContent} threadId={threadId} />
+                <MarkdownContent content={messageContent} threadId={threadId} fallbackImages={fallbackImages} />
               )}
             </div>
           )}
