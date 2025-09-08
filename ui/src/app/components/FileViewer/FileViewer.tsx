@@ -5,6 +5,7 @@ import Image from "next/image";
 import { FileImage, Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import styles from "./FileViewer.module.scss";
+import { getInternalApiBase } from "@/lib/environment/api";
 
 interface FileViewerProps {
   filePath: string;
@@ -17,8 +18,9 @@ export const FileViewer = React.memo<FileViewerProps>(
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Construct the API URL for the file
-    const fileUrl = `http://localhost:8001/api/files${filePath.startsWith("/") ? "" : "/"}${filePath}`;
+    // Construct the API URL for the file via Next proxy
+    const base = getInternalApiBase();
+    const fileUrl = `${base}/files${filePath.startsWith("/") ? "" : "/"}${filePath}`;
     
     const handleDownload = () => {
       const link = document.createElement("a");
