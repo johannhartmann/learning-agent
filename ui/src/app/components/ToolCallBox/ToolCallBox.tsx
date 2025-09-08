@@ -75,6 +75,22 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(({ toolCall, threadId })
     };
   }, [toolCall]);
 
+  // Remove inline images from python_sandbox textual result to avoid duplication with "Generated Files"
+  const resultDisplay = useMemo(() => {
+    if (!result || typeof result !== "string") return result;
+    if (name !== "python_sandbox") return result;
+    let r = result as string;
+    // Remove Markdown image syntax ![alt](src)
+    r = r.replace(/!\[[^\]]*\]\([^\)]+\)/g, "");
+    // Remove HTML <img ...>
+    r = r.replace(/<img\b[^>]*>/gi, "");
+    // Optionally remove the auto note line like "Generated 1 file(s):"
+    r = r.replace(/Generated\s+\d+\s+file\(s\):/gi, "");
+    // Clean up any leftover multiple blank lines
+    r = r.replace(/\n{3,}/g, "\n\n");
+    return r.trim();
+  }, [result, name]);
+
   const statusIcon = useMemo(() => {
     switch (status) {
       case "completed":
@@ -92,7 +108,8 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(({ toolCall, threadId })
     setIsExpanded((prev) => !prev);
   }, []);
 
-  const hasContent = result || Object.keys(args).length > 0 || files.length > 0;
+  const hasResultContent = Boolean(resultDisplay && String(resultDisplay).trim() !== "");
+  const hasContent = hasResultContent || Object.keys(args).length > 0 || files.length > 0;
 
   return (
     <div className={styles.container}>
@@ -189,16 +206,16 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(({ toolCall, threadId })
             </div>
           )}
           
-          {result && (
+          {hasResultContent && (
             <div className={styles.section}>
               <h4 className={styles.sectionTitle}>Result</h4>
               {name === "python_sandbox" ? (
-                <MarkdownContent content={result} threadId={threadId} />
+                <MarkdownContent content={resultDisplay as string} threadId={threadId} />
+              ) : typeof resultDisplay === "string" ? (
+                <pre className={styles.codeBlock}>{resultDisplay}</pre>
               ) : (
                 <pre className={styles.codeBlock}>
-                  {typeof result === "string"
-                    ? result
-                    : JSON.stringify(result, null, 2)}
+                  {JSON.stringify(resultDisplay, null, 2)}
                 </pre>
               )}
             </div>

@@ -43,51 +43,48 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(
               return <div className={styles.preWrapper}>{children}</div>;
             },
             img({ src, alt }: { src?: string; alt?: string }) {
-              // Handle sandbox-file: protocol for in-memory session files
-              if (src && src.startsWith("sandbox-file:")) {
-                const filePath = src.replace("sandbox-file:", "");
-                const actualSrc = `http://localhost:8001/api/files${filePath}${threadId ? `?thread_id=${threadId}` : ''}`;
-                return (
-                  <div className={styles.imageWrapper}>
-                    <Image 
-                      src={actualSrc} 
-                      alt={alt || "Figure"} 
-                      className={styles.figure}
-                      style={{ maxWidth: '100%', height: 'auto' }}
-                      width={800}
-                      height={600}
-                      unoptimized
-                    />
-                    {alt && <p className={styles.imageCaption}>{alt}</p>}
-                  </div>
-                );
+              // Normalize various image references from sandbox/tool output
+              const toApiUrl = (filePath: string) => {
+                const path = filePath.startsWith("/") ? filePath : `/${filePath}`;
+                const q = threadId ? `?thread_id=${threadId}` : "";
+                return `http://localhost:8001/api/files${path}${q}`;
+              };
+
+              let actualSrc: string | undefined = src;
+
+              if (src) {
+                if (src.startsWith("sandbox-file:")) {
+                  // sandbox-file:/tmp/foo.png -> /api/files/tmp/foo.png
+                  actualSrc = toApiUrl(src.replace("sandbox-file:", ""));
+                } else if (src.startsWith("attachment://")) {
+                  // attachment://foo.png -> /api/files/tmp/foo.png (common pattern)
+                  const name = src.replace("attachment://", "");
+                  actualSrc = toApiUrl(`tmp/${name}`);
+                } else if (src.startsWith("data:image")) {
+                  // Base64-encoded image
+                  actualSrc = src;
+                } else if (src.startsWith("/")) {
+                  // Absolute path from sandbox (e.g., /tmp/foo.png)
+                  actualSrc = toApiUrl(src);
+                } else if (!/^https?:\/\//i.test(src)) {
+                  // Relative filename from sandbox output (e.g., foo.png or tmp/foo.png)
+                  actualSrc = toApiUrl(src);
+                }
               }
-              // Handle data URI images (base64 encoded matplotlib figures)
-              if (src && src.startsWith("data:image")) {
-                return (
-                  <div className={styles.imageWrapper}>
-                    <Image 
-                      src={src} 
-                      alt={alt || "Figure"} 
-                      className={styles.figure}
-                      width={800}
-                      height={600}
-                      unoptimized
-                    />
-                    {alt && <p className={styles.imageCaption}>{alt}</p>}
-                  </div>
-                );
-              }
-              // Default image handling
+
               return (
-                <Image
-                  src={src || ""}
-                  alt={alt || "Image"}
-                  className={styles.image}
-                  width={800}
-                  height={600}
-                  unoptimized
-                />
+                <div className={styles.imageWrapper}>
+                  <Image
+                    src={actualSrc || ""}
+                    alt={alt || "Image"}
+                    className={styles.figure}
+                    style={{ maxWidth: "100%", height: "auto" }}
+                    width={800}
+                    height={600}
+                    unoptimized
+                  />
+                  {alt && <p className={styles.imageCaption}>{alt}</p>}
+                </div>
               );
             },
             a({ href, children }: { href?: string; children?: React.ReactNode }) {
