@@ -15,6 +15,7 @@ Environment variables (see .env.example) map to browser-use parameters:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from typing import Any
@@ -43,12 +44,15 @@ def _parse_allowed_domains(raw: str | None) -> list[str] | None:
 
 def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when available
     try:
-        # Lazy imports to avoid hard dependency
-        from langchain_mcp import MCPToolkit  # type: ignore[import-not-found]
-        from mcp.client.stdio import StdioServerParameters  # type: ignore[import-not-found]
+        # Adapters and SDK: we'll open a stdio session and load tools
+        from langchain_mcp_adapters.tools import load_mcp_tools  # type: ignore[import-not-found]
+        from mcp import ClientSession  # type: ignore[import-not-found]
+        from mcp.client.stdio import (  # type: ignore[import-not-found]
+            StdioServerParameters,
+            stdio_client,
+        )
     except Exception as e:  # pragma: no cover - optional dependency path
-        # Dependencies not installed; keep agent functional without browser tools
-        print(f"MCP browser tools unavailable (missing deps): {e}")
+        print(f"MCP browser tools unavailable (missing adapters): {e}")
         return []
 
     # Build environment for the MCP server so it can configure the Browser()
@@ -90,9 +94,23 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
 
     try:
         params = StdioServerParameters(command=command, args=args, env=server_env)
-        toolkit = MCPToolkit.from_stdin_server(params)
-        # Return LangChain tool instances
-        return list(toolkit.get_tools())
+
+        async def _load() -> list[Any]:
+            async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
+                await session.initialize()
+                tools = await load_mcp_tools(session)
+                return list(tools)
+
+        # Synchronously load tools at startup time
+        try:
+            return asyncio.run(_load())
+        except RuntimeError:
+            # In case there's an active loop (unlikely at import time), create a new one
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(_load())
+            finally:
+                loop.close()
     except Exception as e:  # pragma: no cover - runtime issues
         print(f"Failed to initialize browser MCP tools: {e}")
         return []
