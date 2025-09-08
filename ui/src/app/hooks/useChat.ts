@@ -33,16 +33,16 @@ export function useChat(
   }, [deployment]);
 
   const handleUpdateEvent = useCallback(
-    (data: { [node: string]: Partial<StateType> }) => {
+    (data: { [node: string]: any }) => {
       for (const [, nodeData] of Object.entries(data)) {
-        if (nodeData?.todos) {
-          // Debug: Log todo updates to help verify stream events include them
+        const values = (nodeData && typeof nodeData === "object") ? (nodeData.values || nodeData) : {};
+        if (values?.todos) {
           // eslint-disable-next-line no-console
-          console.debug("[stream] todos update", nodeData.todos);
-          onTodosUpdate(nodeData.todos);
+          console.debug("[stream] todos update", values.todos);
+          onTodosUpdate(values.todos);
         }
-        if (nodeData?.files) {
-          onFilesUpdate(nodeData.files);
+        if (values?.files) {
+          onFilesUpdate(values.files);
         }
       }
     },
