@@ -30,8 +30,9 @@ COPY constraints.txt .
 RUN pip install --no-cache-dir uv && \
     uv pip install --system --constraint constraints.txt .
 
-# Install langgraph-cli
-RUN uv pip install --system "langgraph-cli[inmem]"
+# Install langgraph CLI and API to serve graphs in-process
+RUN uv pip install --system "langgraph-cli[inmem]" && \
+    uv pip install --system "langgraph-api"
 
 # Install Postgres checkpointer for LangGraph persistence
 RUN uv pip install --system "langgraph-checkpoint-postgres" && \

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL with pgvector for learning memory storage
   postgres:
@@ -21,9 +19,11 @@ services:
       timeout: 5s
       retries: 5
 
-  # LangGraph server for the learning agent (uses prebuilt image from langgraph build)
+  # Standalone LangGraph server for the learning agent (in-process ASGI app)
   server:
-    image: ${LG_SERVER_IMAGE:-learning_agent_server:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.server
     container_name: learning-agent-server
     ports:
       - "2024:2024"
@@ -37,6 +37,9 @@ services:
       - LLM_PROVIDER=${LLM_PROVIDER:-openai}
       - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
       - DATABASE_URL=postgresql://learning_agent:learning_agent_pass@postgres:5432/learning_memories
+      - DATABASE_URI=postgresql://learning_agent:learning_agent_pass@postgres:5432/learning_memories
+      - LANGGRAPH_RUNTIME_EDITION=inmem
+      - REDIS_URI=memory://
       - BG_JOB_ISOLATED_LOOPS=true
     volumes:
       - ./.agent:/app/.agent
@@ -46,7 +49,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:2024/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:2024/ok"]
       interval: 30s
       timeout: 10s
       retries: 3

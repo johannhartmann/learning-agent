@@ -29,6 +29,7 @@ classifiers = [
 dependencies = [
     "langchain>=0.3.0",
     "langgraph>=0.2.0",
+    "langgraph-api>=0.4.9",
     "langmem>=0.0.29",
     "deepagents>=0.0.1",
     "langchain-sandbox @ git+https://github.com/johannhartmann/langchain-sandbox.git@main#subdirectory=libs/sandbox-py",
@@ -202,6 +203,8 @@ module = [
     "pgvector.*",
     "fastapi",
     "fastapi.*",
+    "starlette",
+    "starlette.*",
     "uvicorn",
     "typer",
     "rich.*",

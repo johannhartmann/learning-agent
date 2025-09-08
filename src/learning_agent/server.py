@@ -1,29 +1,38 @@
 """LangGraph server module for the learning agent.
 
 Configures a Postgres checkpointer for persistence so threads and state
-survive restarts across container rebuilds.
+survive restarts across container rebuilds. Exposes an ASGI app that serves
+the LangGraph API in-process (no external platform/Redis required).
 """
 
-from typing import Any
+import importlib
+import importlib.util
 import os
+from typing import TYPE_CHECKING, Any
 
 from langgraph.graph import END, StateGraph
-import importlib, importlib.util
-print("[persistence] find_spec(langgraph.checkpoint.postgres)=", importlib.util.find_spec("langgraph.checkpoint.postgres"), flush=True)
-print("[persistence] find_spec(langgraph.checkpoint.postgres.aio)=", importlib.util.find_spec("langgraph.checkpoint.postgres.aio"), flush=True)
-try:
-    # Option A: Canonical Postgres saver import (no pin)
-    from langgraph.checkpoint.postgres import PostgresSaver  # type: ignore
-except Exception:  # fallback to standalone package name, if used in this environment
-    try:
-        from langgraph_checkpoint_postgres import PostgresSaver  # type: ignore
-    except Exception as _e:
-        PostgresSaver = None  # type: ignore[assignment]
-# Use Postgres-backed checkpointer for persistence.
-# Prefer the dedicated Postgres saver; fall back to a generic SQLAlchemy saver
-# if available in the current LangGraph version.
+
+from learning_agent.agent import create_learning_agent
+from learning_agent.state import LearningAgentState
+
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Callable
+
+
+print(
+    "[persistence] find_spec(langgraph.checkpoint.postgres)=",
+    importlib.util.find_spec("langgraph.checkpoint.postgres"),
+    flush=True,
+)
+print(
+    "[persistence] find_spec(langgraph.checkpoint.postgres.aio)=",
+    importlib.util.find_spec("langgraph.checkpoint.postgres.aio"),
+    flush=True,
+)
 PostgresSaver = None  # type: ignore[assignment]
 SQLAlchemySaver = None  # type: ignore[assignment]
+
 
 def _try_import(name: str):  # pragma: no cover - helper
     try:
@@ -32,6 +41,7 @@ def _try_import(name: str):  # pragma: no cover - helper
     except Exception:
         return None
     return None
+
 
 _pg_modules = [
     "langgraph.checkpoint.postgres",
@@ -70,9 +80,6 @@ for _name in _sql_modules:
                 break
     if SQLAlchemySaver is not None:
         break
-
-from learning_agent.agent import create_learning_agent
-from learning_agent.state import LearningAgentState
 
 
 def create_graph() -> Any:
@@ -198,5 +205,116 @@ def create_graph() -> Any:
     return workflow.compile(checkpointer=checkpointer)
 
 
-# Export the compiled graph for LangGraph server
+def _build_langgraph_app(graph: Any) -> Any:
+    """Attempt to construct a LangGraph API ASGI app for the given graph.
+
+    Tries multiple import paths to accommodate minor packaging differences.
+    """
+    create_app: Callable[..., Any] | None = None
+
+    # Ensure langgraph_api can import without failing on missing env
+    # Prefer a plain Postgres URI for the platform's expected config
+    default_plain = (
+        "postgresql://learning_agent:learning_agent_pass@postgres:5432/learning_memories"
+    )
+    db_plain = os.environ.get("DATABASE_URI") or os.environ.get("DATABASE_URL") or default_plain
+    os.environ.setdefault("DATABASE_URI", db_plain)
+    os.environ.setdefault("LANGGRAPH_RUNTIME_EDITION", "postgres")
+    os.environ.setdefault("REDIS_URI", os.environ.get("REDIS_URI", "memory://"))
+
+    # Try the common import paths for langgraph-api
+    app = None
+    for mod_path in (
+        "langgraph_api.server",
+        "langgraph_api",
+        "langgraph_server",
+    ):
+        mod = _try_import(mod_path)
+        if mod is None:
+            continue
+        # Preferred: a factory
+        create_app = getattr(mod, "create_app", None)
+        if callable(create_app):
+            print(f"[server] Using create_app from: {mod_path}", flush=True)
+            app = create_app(graphs={"learning_agent": graph})  # type: ignore[call-arg]
+            break
+        # Fallback: module exports a prebuilt Starlette app
+        module_app = getattr(mod, "app", None)
+        if module_app is not None:
+            print(f"[server] Using module.app from: {mod_path}", flush=True)
+            app = module_app
+            break
+
+    if app is None:
+        raise RuntimeError("Could not obtain ASGI app from langgraph-api")
+
+    # Add permissive CORS for local UI/dev usage
+    try:
+        from starlette.middleware.cors import CORSMiddleware
+
+        app.add_middleware(
+            CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+        )
+    except Exception:
+        pass
+
+    # Add a simple health endpoint used by docker-compose healthcheck
+    try:
+        # FastAPI-compatible
+        if hasattr(app, "get"):
+            app.get("/health")(lambda: {"status": "ok"})  # type: ignore[misc]
+        else:
+            # Starlette-compatible
+            from starlette.responses import JSONResponse  # type: ignore
+
+            def _health(_request):  # type: ignore
+                return JSONResponse({"status": "ok"})
+
+            if hasattr(app, "add_route"):
+                app.add_route("/health", _health)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+    # Register our compiled graph during app lifespan (event loop available)
+    try:
+        from contextlib import asynccontextmanager
+
+        import langgraph_api.graph as api_graph  # type: ignore
+
+        graph_id = os.environ.get("NEXT_PUBLIC_AGENT_ID", "learning_agent")
+
+        original_lifespan = getattr(app.router, "lifespan_context", None)
+
+        @asynccontextmanager
+        async def combined_lifespan(a):  # type: ignore
+            if original_lifespan:
+                cm = original_lifespan(a)
+            else:
+                # dummy context manager
+                @asynccontextmanager
+                async def _noop(_):
+                    yield
+
+                cm = _noop(a)
+
+            async with cm:
+                try:
+                    await api_graph.register_graph(graph_id=graph_id, graph=graph, config=None)
+                    print(
+                        f"[server] Registered graph '{graph_id}' with langgraph_api runtime",
+                        flush=True,
+                    )
+                except Exception as e:
+                    print(f"[server] Graph registration failed: {e}", flush=True)
+                yield
+
+        app.router.lifespan_context = combined_lifespan
+    except Exception as e:  # pragma: no cover - best-effort registration
+        print(f"[server] Failed to set lifespan registration: {e}", flush=True)
+
+    return app
+
+
+# Export the compiled graph and ASGI app for the server container
 graph = create_graph()
+app = _build_langgraph_app(graph)
