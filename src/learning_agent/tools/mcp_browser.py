@@ -89,8 +89,8 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
     if args_env:
         args = args_env.split()
     else:
-        # Default module entrypoint commonly used by browser-use for MCP
-        args = ["-m", "browser_use.mcp_server"]
+        # Use our bundled stdio MCP server that wraps browser-use
+        args = ["-m", "learning_agent.mcp.servers.browser_use_stdioserver"]
 
     try:
         params = StdioServerParameters(command=command, args=args, env=server_env)

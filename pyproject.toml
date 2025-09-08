@@ -203,6 +203,8 @@ module = [
     "langchain_fireworks.*",
     "langchain_voyageai.*",
     "langchain_sandbox.*",
+    "browser_use.*",
+    "mcp.*",
     "learning_agent.ui.terminal",
     "asyncpg",
     "asyncpg.*",
