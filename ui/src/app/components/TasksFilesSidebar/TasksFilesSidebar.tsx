@@ -64,6 +64,8 @@ export const TasksFilesSidebar = React.memo<TasksFilesSidebarProps>(
       );
     }
 
+    const defaultTab = todos.length > 0 ? "tasks" : "files";
+
     return (
       <div className={styles.sidebar}>
         <div className={styles.header}>
@@ -77,11 +79,13 @@ export const TasksFilesSidebar = React.memo<TasksFilesSidebarProps>(
             <ChevronLeft size={20} />
           </Button>
         </div>
-        <Tabs defaultValue="tasks" className={styles.tabs}>
+        <Tabs defaultValue={defaultTab} className={styles.tabs}>
           <TabsList className={styles.tabsList}>
-            <TabsTrigger value="tasks" className={styles.tabTrigger}>
-              Tasks ({todos.length})
-            </TabsTrigger>
+            {todos.length > 0 && (
+              <TabsTrigger value="tasks" className={styles.tabTrigger}>
+                Tasks ({todos.length})
+              </TabsTrigger>
+            )}
             <TabsTrigger value="files" className={styles.tabTrigger}>
               Files ({Object.keys(files).length})
             </TabsTrigger>
@@ -91,13 +95,9 @@ export const TasksFilesSidebar = React.memo<TasksFilesSidebarProps>(
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="tasks" className={styles.tabContent}>
-            <ScrollArea className={styles.scrollArea}>
-              {todos.length === 0 ? (
-                <div className={styles.emptyState}>
-                  <p>No tasks yet</p>
-                </div>
-              ) : (
+          {todos.length > 0 && (
+            <TabsContent value="tasks" className={styles.tabContent}>
+              <ScrollArea className={styles.scrollArea}>
                 <div className={styles.todoGroups}>
                   {groupedTodos.in_progress.length > 0 && (
                     <div className={styles.todoGroup}>
@@ -141,9 +141,9 @@ export const TasksFilesSidebar = React.memo<TasksFilesSidebarProps>(
                     </div>
                   )}
                 </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
+              </ScrollArea>
+            </TabsContent>
+          )}
 
           <TabsContent value="files" className={styles.tabContent}>
             <ScrollArea className={styles.scrollArea}>
