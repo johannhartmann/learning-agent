@@ -80,6 +80,19 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
     if cdp:
         server_env["BROWSER_CDP_URL"] = cdp
 
+    # Propagate LLM credentials/env if present
+    for key in [
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GOOGLE_API_KEY",
+        "GROQ_API_KEY",
+        "TOGETHER_API_KEY",
+        "FIREWORKS_API_KEY",
+    ]:
+        val = os.getenv(key)
+        if val:
+            server_env[key] = val
+
     # Command to launch browser-use MCP server; allow override
     command = os.getenv("BROWSER_MCP_COMMAND", "python")
     args_env = os.getenv("BROWSER_MCP_ARGS")
