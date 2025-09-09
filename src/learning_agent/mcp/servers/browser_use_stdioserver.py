@@ -51,7 +51,7 @@ def _get_browser() -> Browser:
 
     allowed = _parse_allowed_domains()
     headless = _truthy("BROWSER_HEADLESS", True)
-    keep_alive = _truthy("BROWSER_KEEP_ALIVE", False)
+    keep_alive = _truthy("BROWSER_KEEP_ALIVE", True)
 
     viewport = None
     try:
