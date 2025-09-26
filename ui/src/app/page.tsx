@@ -38,7 +38,7 @@ export default function HomePage() {
           backgroundColor: "var(--color-surface)"
         }}
       >
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-8 py-6">
+        <div className="flex w-full flex-col gap-2 px-8 py-6">
           <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
             Learning Agent Workspace
           </h1>
@@ -47,7 +47,7 @@ export default function HomePage() {
           </p>
         </div>
       </header>
-      <section className="mx-auto flex w-full flex-1 flex-col gap-6 px-8 py-8 lg:flex-row">
+      <section className="flex w-full flex-1 flex-col gap-6 px-8 py-8 lg:flex-row">
         <div
           className="flex min-h-[70vh] flex-1 flex-col overflow-hidden rounded-2xl border shadow-2xl"
           style={{
