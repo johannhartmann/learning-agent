@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CopilotChat } from "@copilotkit/react-ui";
 
+import { AgentStreaming } from "@/components/copilot/agent-streaming";
 import { ArtifactsGallery } from "@/components/copilot/artifacts-gallery";
 import { LearningPanel } from "@/components/copilot/learning-panel";
 import { TaskList } from "@/components/copilot/task-list";
@@ -31,6 +32,7 @@ export default function HomePage() {
 
   return (
     <main className="flex min-h-screen flex-col" style={{ backgroundColor: "var(--color-background)" }}>
+      <AgentStreaming />
       <header
         className="border-b backdrop-blur-sm px-8 pt-8 pb-6"
         style={{
