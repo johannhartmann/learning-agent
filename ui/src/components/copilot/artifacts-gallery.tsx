@@ -41,23 +41,52 @@ export function ArtifactsGallery() {
 
   if (entries.length === 0) {
     return (
-      <section className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-neutral-900">Artifacts</h2>
-        <p className="mt-2 text-sm text-neutral-500">Generated plots, notebooks, and markdown reports will appear here.</p>
+      <section
+        className="rounded-xl border p-5 shadow-lg"
+        style={{
+          borderColor: "var(--color-border)",
+          backgroundColor: "var(--color-surface)"
+        }}
+      >
+        <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
+          Artifacts
+        </h2>
+        <p className="mt-3 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          Generated plots, notebooks, and markdown reports will appear here.
+        </p>
       </section>
     );
   }
 
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-      <h2 className="text-base font-semibold text-neutral-900">Artifacts</h2>
-      <div className="mt-3 grid gap-4">
+    <section
+      className="rounded-xl border p-5 shadow-lg"
+      style={{
+        borderColor: "var(--color-border)",
+        backgroundColor: "var(--color-surface)"
+      }}
+    >
+      <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
+        Artifacts
+      </h2>
+      <div className="mt-4 grid gap-4">
         {entries.map(([name, content]) => {
           if (typeof content !== "string") {
             return (
-              <details key={name} className="rounded border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900">
+              <details
+                key={name}
+                className="rounded-lg border p-3 text-sm"
+                style={{
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-background)",
+                  color: "var(--color-text-primary)"
+                }}
+              >
                 <summary className="cursor-pointer font-medium">{name}</summary>
-                <pre className="mt-2 overflow-auto text-xs text-neutral-700">
+                <pre
+                  className="mt-2 overflow-auto text-xs"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
                   {JSON.stringify(content, null, 2)}
                 </pre>
               </details>
@@ -67,16 +96,28 @@ export function ArtifactsGallery() {
           if (isImage(name)) {
             const src = resolveImageSource(name, content);
             return (
-              <figure key={name} className="rounded border border-neutral-200 bg-neutral-50 p-3">
+              <figure
+                key={name}
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-background)"
+                }}
+              >
                 <Image
                   src={src}
                   alt={name}
                   width={800}
                   height={600}
-                  className="h-auto w-full rounded"
+                  className="h-auto w-full rounded-lg"
                   unoptimized
                 />
-                <figcaption className="mt-2 text-xs text-neutral-500">{name}</figcaption>
+                <figcaption
+                  className="mt-2 text-xs"
+                  style={{ color: "var(--color-text-tertiary)" }}
+                >
+                  {name}
+                </figcaption>
               </figure>
             );
           }
@@ -85,9 +126,19 @@ export function ArtifactsGallery() {
             return (
               <article
                 key={name}
-                className="rounded border border-neutral-200 bg-white p-3 text-sm text-neutral-900"
+                className="rounded-lg border p-4 text-sm"
+                style={{
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-surface)",
+                  color: "var(--color-text-primary)"
+                }}
               >
-                <header className="mb-2 text-sm font-semibold text-neutral-800">{name}</header>
+                <header
+                  className="mb-3 text-sm font-semibold"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  {name}
+                </header>
                 <ReactMarkdown remarkPlugins={[remarkGfm]} className="markdown-body">
                   {content}
                 </ReactMarkdown>
@@ -96,9 +147,22 @@ export function ArtifactsGallery() {
           }
 
           return (
-            <details key={name} className="rounded border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-900">
+            <details
+              key={name}
+              className="rounded-lg border p-3 text-sm"
+              style={{
+                borderColor: "var(--color-border)",
+                backgroundColor: "var(--color-background)",
+                color: "var(--color-text-primary)"
+              }}
+            >
               <summary className="cursor-pointer font-medium">{name}</summary>
-              <pre className="mt-2 overflow-auto text-xs text-neutral-700">{content}</pre>
+              <pre
+                className="mt-2 overflow-auto text-xs"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                {content}
+              </pre>
             </details>
           );
         })}

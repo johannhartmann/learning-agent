@@ -8,15 +8,22 @@ import { LEARNING_AGENT_KEY, type LearningAgentState } from "./types";
 
 function MemoryCard({ memory }: { memory: Memory }) {
   return (
-    <article className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 text-sm text-neutral-900">
+    <article
+      className="rounded-lg border p-3 text-sm"
+      style={{
+        borderColor: "var(--color-border)",
+        backgroundColor: "var(--color-background)",
+        color: "var(--color-text-primary)"
+      }}
+    >
       <header className="mb-2 flex items-center justify-between gap-2">
-        <span className="font-semibold text-indigo-700">{memory.task}</span>
-        <span className="text-xs uppercase tracking-wide text-neutral-500">{memory.outcome}</span>
+        <span className="font-semibold" style={{ color: "var(--color-primary)" }}>{memory.task}</span>
+        <span className="text-xs uppercase tracking-wide" style={{ color: "var(--color-text-tertiary)" }}>{memory.outcome}</span>
       </header>
-      <p className="text-sm text-neutral-800">{memory.narrative}</p>
+      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{memory.narrative}</p>
       {memory.reflection ? (
-        <p className="mt-2 text-xs text-neutral-600">
-          <span className="font-medium text-neutral-700">Reflection:</span> {memory.reflection}
+        <p className="mt-2 text-xs" style={{ color: "var(--color-text-tertiary)" }}>
+          <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>Reflection:</span> {memory.reflection}
         </p>
       ) : null}
     </article>
@@ -25,26 +32,40 @@ function MemoryCard({ memory }: { memory: Memory }) {
 
 function PatternCard({ pattern }: { pattern: Pattern }) {
   return (
-    <article className="rounded-lg border border-amber-100 bg-amber-50/60 p-3 text-sm text-neutral-900">
+    <article
+      className="rounded-lg border p-3 text-sm"
+      style={{
+        borderColor: "var(--color-border)",
+        backgroundColor: "var(--color-background)",
+        color: "var(--color-text-primary)"
+      }}
+    >
       <header className="mb-1 flex items-center justify-between gap-2">
-        <span className="font-semibold text-amber-700">Pattern #{pattern.id}</span>
-        <span className="text-xs text-neutral-500">Confidence {Math.round(pattern.confidence * 100)}%</span>
+        <span className="font-semibold" style={{ color: "var(--color-warning)" }}>Pattern #{pattern.id}</span>
+        <span className="text-xs" style={{ color: "var(--color-text-tertiary)" }}>Confidence {Math.round(pattern.confidence * 100)}%</span>
       </header>
-      <p className="text-sm text-neutral-800">{pattern.description}</p>
+      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{pattern.description}</p>
     </article>
   );
 }
 
 function QueueCard({ item }: { item: ExecutionData }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-neutral-900">
+    <article
+      className="rounded-lg border p-3 text-sm"
+      style={{
+        borderColor: "var(--color-border)",
+        backgroundColor: "var(--color-background)",
+        color: "var(--color-text-primary)"
+      }}
+    >
       <header className="mb-1 flex items-center justify-between gap-2">
-        <span className="font-semibold text-slate-700">{item.task}</span>
-        <span className="text-xs text-neutral-500">{item.outcome}</span>
+        <span className="font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.task}</span>
+        <span className="text-xs" style={{ color: "var(--color-text-tertiary)" }}>{item.outcome}</span>
       </header>
-      {item.description ? <p className="text-sm text-neutral-800">{item.description}</p> : null}
+      {item.description ? <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{item.description}</p> : null}
       {item.error ? (
-        <p className="mt-1 text-xs text-red-600">{item.error}</p>
+        <p className="mt-1 text-xs" style={{ color: "var(--color-error)" }}>{item.error}</p>
       ) : null}
     </article>
   );
@@ -60,30 +81,30 @@ export function LearningPanel() {
   return (
     <div className="grid gap-6">
       <section>
-        <h2 className="text-base font-semibold text-neutral-900">Memories</h2>
+        <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Memories</h2>
         <div className="mt-3 grid gap-3">
           {memories.length === 0 ? (
-            <p className="text-sm text-neutral-500">Learning memories will appear here once the agent reflects.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>Learning memories will appear here once the agent reflects.</p>
           ) : (
             memories.map((memory) => <MemoryCard key={memory.id} memory={memory} />)
           )}
         </div>
       </section>
       <section>
-        <h2 className="text-base font-semibold text-neutral-900">Patterns</h2>
+        <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Patterns</h2>
         <div className="mt-3 grid gap-3">
           {patterns.length === 0 ? (
-            <p className="text-sm text-neutral-500">The agent will list reusable tactics and anti-patterns as it works.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>The agent will list reusable tactics and anti-patterns as it works.</p>
           ) : (
             patterns.map((pattern) => <PatternCard key={pattern.id} pattern={pattern} />)
           )}
         </div>
       </section>
       <section>
-        <h2 className="text-base font-semibold text-neutral-900">Learning Queue</h2>
+        <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Learning Queue</h2>
         <div className="mt-3 grid gap-3">
           {learningQueue.length === 0 ? (
-            <p className="text-sm text-neutral-500">Pending evaluations appear here during narrative learning.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>Pending evaluations appear here during narrative learning.</p>
           ) : (
             learningQueue.map((item, index) => <QueueCard key={`${item.task}-${index}`} item={item} />)
           )}

@@ -23,24 +23,50 @@ export function TaskList() {
 
   if (!todos.length) {
     return (
-      <section className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold text-neutral-900">Task List</h2>
-        <p className="mt-2 text-sm text-neutral-500">No tasks yet. Ask the agent to plan a workflow.</p>
+      <section
+        className="rounded-xl border p-5 shadow-lg"
+        style={{
+          borderColor: "var(--color-border)",
+          backgroundColor: "var(--color-surface)"
+        }}
+      >
+        <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
+          Task List
+        </h2>
+        <p className="mt-3 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          No tasks yet. Ask the agent to plan a workflow.
+        </p>
       </section>
     );
   }
 
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-      <h2 className="text-base font-semibold text-neutral-900">Task List</h2>
-      <ol className="mt-3 space-y-2 text-sm text-neutral-900">
+    <section
+      className="rounded-xl border p-5 shadow-lg"
+      style={{
+        borderColor: "var(--color-border)",
+        backgroundColor: "var(--color-surface)"
+      }}
+    >
+      <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
+        Task List
+      </h2>
+      <ol className="mt-4 space-y-3 text-sm">
         {todos.map((todo, index) => (
-          <li key={`${todo.content}-${index}`} className="flex items-start gap-2">
-            <span className="mt-1 inline-flex h-2 w-2 flex-none rounded-full bg-indigo-500" aria-hidden />
+          <li key={`${todo.content}-${index}`} className="flex items-start gap-3">
+            <span
+              className="mt-1.5 inline-flex h-2 w-2 flex-none rounded-full"
+              style={{ backgroundColor: "var(--color-primary)" }}
+              aria-hidden
+            />
             <div>
-              <p className="font-medium">{todo.content}</p>
+              <p className="font-medium leading-relaxed" style={{ color: "var(--color-text-primary)" }}>
+                {todo.content}
+              </p>
               {todo.status && todo.status !== "pending" ? (
-                <p className="text-xs text-neutral-500">{todo.status.replace("_", " ")}</p>
+                <p className="mt-1 text-xs" style={{ color: "var(--color-text-tertiary)" }}>
+                  {todo.status.replace("_", " ")}
+                </p>
               ) : null}
             </div>
           </li>

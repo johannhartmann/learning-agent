@@ -30,36 +30,68 @@
   --destructive: #ef4444;
 }
 
+/* Support both system preference and manual dark mode toggle */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     /* App-specific color variables */
-    --color-primary: #2dd4bf;
+    --color-primary: #6366f1;
     --color-user-message: #0ea5e9;
     --color-avatar-bg: #4c1d95;
-    --color-secondary: #2dd4bf;
+    --color-secondary: #6366f1;
     --color-success: #34d399;
     --color-warning: #fbbf24;
     --color-error: #f87171;
-    --color-background: #0f0f0f;
+    --color-background: #0a0a0a;
     --color-subagent-hover: #6d28d9;
-    --color-surface: #1a1a1a;
-    --color-border: #2d2d2d;
-    --color-border-light: #232323;
-    --color-text-primary: #f3f4f6;
-    --color-text-secondary: #9ca3af;
-    --color-text-tertiary: #6b7280;
+    --color-surface: #161616;
+    --color-border: #2a2a2a;
+    --color-border-light: #1f1f1f;
+    --color-text-primary: #e4e4e7;
+    --color-text-secondary: #a1a1aa;
+    --color-text-tertiary: #71717a;
 
     /* Tailwind/Radix UI component variables for dark mode */
-    --background: #0f0f0f;
-    --foreground: #f3f4f6;
-    --muted: #232323;
-    --muted-foreground: #9ca3af;
-    --primary: #2dd4bf;
-    --primary-foreground: #0f0f0f;
-    --input: #2d2d2d;
-    --ring: #2dd4bf;
+    --background: #0a0a0a;
+    --foreground: #e4e4e7;
+    --muted: #1f1f1f;
+    --muted-foreground: #a1a1aa;
+    --primary: #6366f1;
+    --primary-foreground: #ffffff;
+    --input: #2a2a2a;
+    --ring: #6366f1;
     --destructive: #f87171;
   }
+}
+
+/* Manual dark mode class */
+.dark {
+  /* App-specific color variables */
+  --color-primary: #6366f1;
+  --color-user-message: #0ea5e9;
+  --color-avatar-bg: #4c1d95;
+  --color-secondary: #6366f1;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+  --color-background: #0a0a0a;
+  --color-subagent-hover: #6d28d9;
+  --color-surface: #161616;
+  --color-border: #2a2a2a;
+  --color-border-light: #1f1f1f;
+  --color-text-primary: #e4e4e7;
+  --color-text-secondary: #a1a1aa;
+  --color-text-tertiary: #71717a;
+
+  /* Tailwind/Radix UI component variables for dark mode */
+  --background: #0a0a0a;
+  --foreground: #e4e4e7;
+  --muted: #1f1f1f;
+  --muted-foreground: #a1a1aa;
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --input: #2a2a2a;
+  --ring: #6366f1;
+  --destructive: #f87171;
 }
 
 @theme inline {
