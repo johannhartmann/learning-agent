@@ -1,6 +1,9 @@
 # Dockerfile for LangGraph server
 FROM python:3.11-slim
 
+ARG UV_NO_CACHE=0
+ENV UV_NO_CACHE=${UV_NO_CACHE}
+
 # Set working directory
 WORKDIR /app
 
@@ -25,18 +28,30 @@ COPY src/ ./src/
 COPY tests/ ./tests/
 COPY langgraph.json .
 COPY constraints.txt .
-
-# Install Python dependencies with constraints to ensure GitHub source
+########################################
+# Deepagents ref for cache-busting and pinning
+########################################
+# Install Python dependencies with constraints
 RUN pip install --no-cache-dir uv && \
+    if [ "$UV_NO_CACHE" = "1" ]; then uv cache clean && rm -rf /root/.cache/uv; fi && \
     uv pip install --system --constraint constraints.txt .[browser] && \
     python -m playwright install --with-deps chromium
 
+# Install upstream deepagents (latest published ref)
+RUN set -eux; \
+    echo "🧩 Installing deepagents from upstream"; \
+    if [ "$UV_NO_CACHE" = "1" ]; then uv cache clean && rm -rf /root/.cache/uv; fi; \
+    uv pip install --system deepagents; \
+    python -c "import deepagents,inspect; import deepagents.sub_agent as sa; print('[deepagents] module:', deepagents.__file__); s=inspect.getsource(sa._create_task_tool); print('[deepagents] task tool contains graph handoff =', 'graph=' in s)"
+
 # Install langgraph CLI and API to serve graphs in-process
-RUN uv pip install --system "langgraph-cli[inmem]" && \
+RUN if [ "$UV_NO_CACHE" = "1" ]; then uv cache clean && rm -rf /root/.cache/uv; fi && \
+    uv pip install --system "langgraph-cli[inmem]" && \
     uv pip install --system "langgraph-api"
 
 # Install Postgres checkpointer for LangGraph persistence
-RUN uv pip install --system "langgraph-checkpoint-postgres" && \
+RUN if [ "$UV_NO_CACHE" = "1" ]; then uv cache clean && rm -rf /root/.cache/uv; fi && \
+    uv pip install --system "langgraph-checkpoint-postgres" && \
     uv pip install --system "langgraph-checkpoint" && \
     uv pip install --system "psycopg[binary,pool]"
 

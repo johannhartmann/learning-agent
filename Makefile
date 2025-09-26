@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs reset check-imports
+.PHONY: help build build-update up down restart logs reset check-imports
 
 # Minimal Makefile for Docker Compose-based standalone server
 
@@ -8,8 +8,12 @@ help: ## Show this help message
 	@echo "Available targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 
-build: ## Build server and UI images
+build: ## Build server and UI images (installs upstream deepagents)
 	docker compose build server ui
+
+build-update: ## Force rebuild server without cache (skip uv wheel cache)
+	docker compose build --no-cache --build-arg UV_NO_CACHE=1 server
+	docker compose build ui
 
 
 up: ## Start services with Compose

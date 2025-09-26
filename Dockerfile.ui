@@ -8,16 +8,19 @@ WORKDIR /app
 COPY ui/package*.json ./
 
 # Install dependencies
-RUN npm ci
+# Use npm install to allow lockfile update during container build
+RUN npm install --no-audit --no-fund
 
 # Copy the rest of the UI files
 COPY ui/ .
 
-# Skip build for now due to linting errors in upstream
-# Will run in dev mode instead
+ENV NODE_ENV=production
+
+# Build Next.js app for production
+RUN npm run build
 
 # Expose port for Next.js
 EXPOSE 3000
 
-# Run the Next.js server in development mode
-CMD ["npm", "run", "dev"]
+# Run the Next.js server in production mode
+CMD ["npm", "run", "start"]

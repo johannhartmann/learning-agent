@@ -11,10 +11,11 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgres-init:/docker-entrypoint-initdb.d:ro
     networks:
       - learning-agent-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U learning_agent"]
+      test: ["CMD-SHELL", "pg_isready -U learning_agent -d learning_memories -h localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,6 +25,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.server
+      args:
+        DEEPAGENTS_REF: ${DEEPAGENTS_REF:-master}
     container_name: learning-agent-server
     ports:
       - "2024:2024"
@@ -34,6 +37,7 @@ services:
       - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
       - LANGSMITH_TRACING=true
       - LANGSMITH_PROJECT=learning-agent
+      - PYTHONPATH=/app/src
       - LLM_PROVIDER=${LLM_PROVIDER:-openai}
       - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
       - DATABASE_URL=postgresql://learning_agent:learning_agent_pass@postgres:5432/learning_memories
@@ -42,7 +46,6 @@ services:
       - REDIS_URI=memory://
       - BG_JOB_ISOLATED_LOOPS=true
       - BROWSER_HEADLESS=${BROWSER_HEADLESS:-true}
-      - BROWSER_ALLOWED_DOMAINS=${BROWSER_ALLOWED_DOMAINS:-}
       - BROWSER_CDP_URL=${BROWSER_CDP_URL:-}
       - BROWSER_KEEP_ALIVE=${BROWSER_KEEP_ALIVE:-false}
       - BROWSER_MIN_WAIT=${BROWSER_MIN_WAIT:-0.25}
@@ -62,6 +65,33 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./src
+          target: /app/src
+          ignore:
+            - "**/__pycache__"
+            - "**/*.pyc"
+            - "**/.pytest_cache"
+            - "**/.mypy_cache"
+            - "**/.ruff_cache"
+            - "**/.venv"
+            - "**/.DS_Store"
+        - action: sync+restart
+          path: ./scripts
+          target: /app/scripts
+          ignore:
+            - "**/__pycache__"
+            - "**/*.pyc"
+            - "**/.DS_Store"
+        - action: sync
+          path: ./langgraph.json
+          target: /app/langgraph.json
+        - action: rebuild
+          path: pyproject.toml
+        - action: rebuild
+          path: Dockerfile.server
 
   # Deep Agents UI
   ui:
@@ -72,14 +102,31 @@ services:
     ports:
       - "10300:3000"
     environment:
-      - NEXT_PUBLIC_DEPLOYMENT_URL=http://localhost:2024
+      - NODE_ENV=production
       - NEXT_PUBLIC_AGENT_ID=learning_agent
+      - LANGGRAPH_API_BASE=http://server:2024
       - NEXT_PUBLIC_LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
       - INTERNAL_API_BASE=http://server:8001
     depends_on:
       - server
     networks:
       - learning-agent-network
+    develop:
+      watch:
+        - action: rebuild
+          path: ui/package.json
+        - action: rebuild
+          path: ui/package-lock.json
+        - action: rebuild
+          path: ui/next.config.ts
+        - action: rebuild
+          path: Dockerfile.ui
+        - action: rebuild
+          path: ./ui/src/app
+        - action: rebuild
+          path: ./ui/src/components
+        - action: rebuild
+          path: ./ui/src/app/hooks
 
   # Test runner service
   test:
@@ -95,6 +142,7 @@ services:
       - LLM_PROVIDER=${LLM_PROVIDER:-openai}
       - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
       - DATABASE_URL=postgresql://learning_agent:learning_agent_pass@postgres:5432/learning_memories
+      - PYTHONPATH=/app/src
       - PYTEST_ADDOPTS=-v --tb=short --color=yes
     volumes:
       - ./src:/app/src:ro
