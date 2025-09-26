@@ -47,7 +47,7 @@ export default function HomePage() {
           </p>
         </div>
       </header>
-      <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-8 py-8 lg:flex-row">
+      <section className="mx-auto flex w-full flex-1 flex-col gap-6 px-8 py-8 lg:flex-row">
         <div
           className="flex min-h-[70vh] flex-1 flex-col overflow-hidden rounded-2xl border shadow-2xl"
           style={{
@@ -63,7 +63,7 @@ export default function HomePage() {
             showDevConsole={false}
           />
         </div>
-        <aside className="flex w-full max-w-md flex-col gap-4">
+        <aside className="flex w-full flex-col gap-4 lg:w-80 lg:flex-shrink-0">
           <nav
             className="rounded-xl border p-2 shadow-lg"
             style={{
