@@ -20,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={inter.className}>
-        <CopilotKit runtimeUrl="/api/copilotkit" agent={LEARNING_AGENT_KEY}>
+        <CopilotKit runtimeUrl="/api/copilotkit" agent={LEARNING_AGENT_KEY} showDevConsole={false}>
           {children}
         </CopilotKit>
       </body>
