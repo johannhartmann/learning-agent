@@ -30,5 +30,6 @@ Open [http://localhost:3000](http://localhost:3000) to chat with the agent.
 ### What to expect
 
 - The `/api/copilotkit` route bridges CopilotKit to your LangGraph deployment via the AG-UI protocol.
+- Copilot Cloud features are disabled (`COPILOTKIT_TELEMETRY_DISABLED=true`); the UI only talks to your local runtime.
 - Chat responses render in the CopilotKit window; todos, learning signals, and artifacts stream into the side panels in real time.
 - Update the backend to emit additional state keys if you need to show more learning context in the UI.
