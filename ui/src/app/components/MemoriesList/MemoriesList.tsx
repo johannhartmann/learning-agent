@@ -20,6 +20,18 @@ import {
 import type { Memory } from "../../types/types";
 import styles from "./MemoriesList.module.scss";
 
+const SIGNAL_LABELS: Record<string, string> = {
+  tool_usage: "Tool usage",
+  analysis_findings: "Analysis findings",
+  tool_messages: "Tool messages",
+  completed_tasks: "Completed tasks",
+  todo_progress: "Todo progress",
+  task_execution_event: "Task execution",
+  failure_outcome: "Failure outcome",
+  execution_error: "Execution error",
+  reported_error: "Reported error",
+};
+
 interface MemoriesListProps {
   memories: Memory[];
   onMemoryClick?: (memory: Memory) => void;
@@ -234,9 +246,31 @@ export const MemoriesList = React.memo<MemoriesListProps>(
                       </button>
                     </div>
                   </div>
-                  <div className={styles.timestamp}>
-                    <Clock size={12} />
-                    <span>{formatTimestamp(memory.timestamp)}</span>
+                  <div className={styles.metadataRow}>
+                    <div className={styles.timestamp}>
+                      <Clock size={12} />
+                      <span>{formatTimestamp(memory.timestamp)}</span>
+                    </div>
+                    {Array.isArray(memory.metadata?.learning_signals) &&
+                      memory.metadata.learning_signals.length > 0 && (
+                        <div className={styles.signalGroup}>
+                          {memory.metadata.learning_signals.slice(0, 3).map((signal: string) => (
+                            <Badge
+                              key={signal}
+                              variant="outline"
+                              className={styles.signalBadge}
+                              title={SIGNAL_LABELS[signal] || signal.replace(/_/g, " ")}
+                            >
+                              {SIGNAL_LABELS[signal] || signal.replace(/_/g, " ")}
+                            </Badge>
+                          ))}
+                          {memory.metadata.learning_signals.length > 3 && (
+                            <Badge variant="outline" className={styles.signalBadge}>
+                              +{memory.metadata.learning_signals.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                   </div>
                 </CardHeader>
 
@@ -272,6 +306,21 @@ export const MemoriesList = React.memo<MemoriesListProps>(
                             "Meta Learning",
                             memory.meta_learning,
                             <Brain size={16} className={styles.metaIcon} />
+                          )}
+                          {memory.metadata?.learning_signals && memory.metadata.learning_signals.length > 0 && (
+                            <div className={styles.learningSection}>
+                              <div className={styles.sectionHeader}>
+                                <Lightbulb size={16} />
+                                <h5>Why this was stored</h5>
+                              </div>
+                              <ul className={styles.learningItems}>
+                                {memory.metadata.learning_signals.map((signal: string) => (
+                                  <li key={signal} className={styles.learningItem}>
+                                    {SIGNAL_LABELS[signal] || signal.replace(/_/g, " ")}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
                           )}
                           {renderAntiPatterns(memory.anti_patterns)}
                         </div>

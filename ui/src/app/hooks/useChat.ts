@@ -13,6 +13,15 @@ type StateType = {
   files: Record<string, string>;
 };
 
+type ToolStreamEvent = {
+  callId: string;
+  parentId: string | null;
+  tool: string;
+  event: string;
+  payload: Record<string, unknown>;
+  ts: number;
+};
+
 export function useChat(
   threadId: string | null,
   setThreadId: (
@@ -58,7 +67,7 @@ export function useChat(
       "x-auth-scheme": "langsmith",
     },
     // Ensure we receive incremental state + message updates, including from subgraphs
-    streamMode: ["values", "messages", "updates"],
+    streamMode: ["values", "messages", "updates", "custom"],
     streamSubgraphs: true,
   });
 
@@ -95,5 +104,6 @@ export function useChat(
     isLoading: stream.isLoading,
     sendMessage,
     stopStream,
+    customEvents: (stream as unknown as { customEvents?: ToolStreamEvent[] }).customEvents ?? [],
   };
 }

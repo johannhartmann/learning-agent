@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo } from "react";
 import { User, Bot } from "lucide-react";
-import { SubAgentIndicator } from "../SubAgentIndicator/SubAgentIndicator";
+import { SubAgentCard } from "../SubAgentCard/SubAgentCard";
 import { ToolCallBox } from "../ToolCallBox/ToolCallBox";
 import { MarkdownContent } from "../MarkdownContent/MarkdownContent";
 import type { SubAgent, ToolCall } from "../../types/types";
@@ -122,7 +122,6 @@ export const ChatMessage = React.memo<ChatMessageProps>(
           {hasToolCalls && (
             <div className={styles.toolCalls}>
               {toolCalls.map((toolCall: ToolCall) => {
-                if (toolCall.name === "task") return null;
                 return <ToolCallBox key={toolCall.id} toolCall={toolCall} threadId={threadId} />;
               })}
             </div>
@@ -130,10 +129,11 @@ export const ChatMessage = React.memo<ChatMessageProps>(
           {!isUser && subAgents.length > 0 && (
             <div className={styles.subAgents}>
               {subAgents.map((subAgent: SubAgent) => (
-                <SubAgentIndicator
+                <SubAgentCard
                   key={subAgent.id}
                   subAgent={subAgent}
-                  onClick={() => onSelectSubAgent(subAgent)}
+                  onSelect={onSelectSubAgent}
+                  isSelected={selectedSubAgent?.id === subAgent.id}
                 />
               ))}
             </div>

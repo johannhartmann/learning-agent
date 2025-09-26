@@ -101,4 +101,6 @@
   flex-direction: column;
   width: fit-content;
   max-width: 100%;
+  gap: $spacing-sm;
+  margin-top: $spacing-md;
 }

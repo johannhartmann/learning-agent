@@ -125,12 +125,30 @@
   }
 }
 
+.metadataRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
 .timestamp {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
+}
+
+.signalGroup {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.signalBadge {
+  text-transform: capitalize;
+  font-size: 0.65rem;
 }
 
 .memoryContent {

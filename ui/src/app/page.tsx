@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, Suspense } from "react";
 import { useQueryState } from "nuqs";
 import { ChatInterface } from "./components/ChatInterface/ChatInterface";
 import { TasksFilesSidebar } from "./components/TasksFilesSidebar/TasksFilesSidebar";
@@ -12,7 +12,7 @@ import { useMemoryPolling } from "@/hooks/useMemoryPolling";
 import type { SubAgent, FileItem, TodoItem, Memory, Pattern, ExecutionData } from "./types/types";
 import styles from "./page.module.scss";
 
-export default function HomePage() {
+function HomePage() {
   const { session } = useAuthContext();
   const [threadId, setThreadId] = useQueryState("threadId");
   const [selectedSubAgent, setSelectedSubAgent] = useState<SubAgent | null>(
@@ -136,5 +136,13 @@ export default function HomePage() {
         />
       )}
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <HomePage />
+    </Suspense>
   );
 }

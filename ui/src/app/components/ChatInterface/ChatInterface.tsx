@@ -108,6 +108,13 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(
       }
       const messageMap = new Map<string, ProcessedEntry>();
       messages.forEach((message: Message) => {
+        if (message.type === "human") {
+          messageMap.set(message.id!, {
+            message,
+            toolCalls: [],
+          });
+        }
+
         if (message.type === "ai") {
           type ToolCallLike = {
             id?: string;
@@ -186,14 +193,11 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(
             };
             break;
           }
-        } else if (message.type === "human") {
-          messageMap.set(message.id!, {
-            message,
-            toolCalls: [],
-          });
         }
       });
-      const processedArray = Array.from(messageMap.values());
+      const processedArray = Array.from(messageMap.values()).filter(({ message }) =>
+        message.type !== "tool"
+      );
       return processedArray.map((data, index) => {
         const prevMessage =
           index > 0 ? processedArray[index - 1].message : null;
