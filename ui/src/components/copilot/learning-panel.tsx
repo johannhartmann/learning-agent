@@ -79,32 +79,50 @@ export function LearningPanel() {
   const learningQueue = useMemo(() => state?.learning_queue ?? [], [state?.learning_queue]);
 
   return (
-    <div className="grid gap-6">
-      <section>
-        <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Memories</h2>
-        <div className="mt-3 grid gap-3">
+    <div className="grid gap-4">
+      <section
+        className="rounded-xl border p-5 shadow-lg"
+        style={{
+          borderColor: "var(--color-border)",
+          backgroundColor: "var(--color-surface)"
+        }}
+      >
+        <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>Memories</h2>
+        <div className="mt-4 grid gap-3">
           {memories.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>Learning memories will appear here once the agent reflects.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>Learning memories will appear here once the agent reflects.</p>
           ) : (
             memories.map((memory) => <MemoryCard key={memory.id} memory={memory} />)
           )}
         </div>
       </section>
-      <section>
-        <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Patterns</h2>
-        <div className="mt-3 grid gap-3">
+      <section
+        className="rounded-xl border p-5 shadow-lg"
+        style={{
+          borderColor: "var(--color-border)",
+          backgroundColor: "var(--color-surface)"
+        }}
+      >
+        <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>Patterns</h2>
+        <div className="mt-4 grid gap-3">
           {patterns.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>The agent will list reusable tactics and anti-patterns as it works.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>The agent will list reusable tactics and anti-patterns as it works.</p>
           ) : (
             patterns.map((pattern) => <PatternCard key={pattern.id} pattern={pattern} />)
           )}
         </div>
       </section>
-      <section>
-        <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>Learning Queue</h2>
-        <div className="mt-3 grid gap-3">
+      <section
+        className="rounded-xl border p-5 shadow-lg"
+        style={{
+          borderColor: "var(--color-border)",
+          backgroundColor: "var(--color-surface)"
+        }}
+      >
+        <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>Learning Queue</h2>
+        <div className="mt-4 grid gap-3">
           {learningQueue.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>Pending evaluations appear here during narrative learning.</p>
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>Pending evaluations appear here during narrative learning.</p>
           ) : (
             learningQueue.map((item, index) => <QueueCard key={`${item.task}-${index}`} item={item} />)
           )}
