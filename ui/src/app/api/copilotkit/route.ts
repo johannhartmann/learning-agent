@@ -10,21 +10,11 @@ import {
 process.env.COPILOTKIT_TELEMETRY_DISABLED = "true";
 process.env.DO_NOT_TRACK = "1";
 
-const deploymentUrl =
-  process.env.NEXT_PUBLIC_DEPLOYMENT_URL ??
-  process.env.DEPLOYMENT_URL ??
-  process.env.LANGGRAPH_API_BASE ??
-  "http://server:2024";
-const graphId = process.env.NEXT_PUBLIC_AGENT_ID ?? process.env.AGENT_ID;
+// In Docker, always use the service name for inter-container communication
+// The backend service is named "server" in docker-compose.yml
+const deploymentUrl = "http://server:2024";
+const graphId = process.env.NEXT_PUBLIC_AGENT_ID ?? process.env.AGENT_ID ?? "learning_agent";
 const langsmithApiKey = process.env.LANGSMITH_API_KEY ?? process.env.NEXT_PUBLIC_LANGSMITH_API_KEY;
-
-if (!deploymentUrl) {
-  throw new Error("Missing NEXT_PUBLIC_DEPLOYMENT_URL environment variable.");
-}
-
-if (!graphId) {
-  throw new Error("Missing NEXT_PUBLIC_AGENT_ID environment variable.");
-}
 
 const agentKey = "learning_agent";
 

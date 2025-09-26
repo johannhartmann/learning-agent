@@ -43,8 +43,9 @@ export default function HomePage() {
         <div className="flex min-h-[60vh] flex-1 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
           <CopilotChat
             className="flex h-full flex-col"
-            instructions="You are the Learning Agent. Maintain the todo list in state.todos, capture artifacts in state.files, and update memories, patterns, and learning_queue as you reflect."
+            instructions="You are the Learning Agent. Maintain the todo list in state.todos, capture artifacts in state.files, and update memories, patterns, and learning_queue as you reflect. When you generate code, images, or other artifacts, include them in your response using markdown code blocks or image syntax."
             labels={{ title: "Learning Agent", initial: "What should we tackle?" }}
+            showResponseButton={true}
           />
         </div>
         <aside className="flex w-full max-w-sm flex-col gap-4">

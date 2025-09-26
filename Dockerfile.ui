@@ -14,7 +14,11 @@ RUN npm install --no-audit --no-fund
 # Copy the rest of the UI files
 COPY ui/ .
 
+# Set build-time environment variables for Next.js
+# These NEXT_PUBLIC_ variables are embedded in the build
 ENV NODE_ENV=production
+ENV NEXT_PUBLIC_DEPLOYMENT_URL=http://server:2024
+ENV NEXT_PUBLIC_AGENT_ID=learning_agent
 
 # Build Next.js app for production
 RUN npm run build
