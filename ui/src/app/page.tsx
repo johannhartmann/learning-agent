@@ -32,13 +32,13 @@ export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col" style={{ backgroundColor: "var(--color-background)" }}>
       <header
-        className="border-b backdrop-blur-sm"
+        className="border-b backdrop-blur-sm px-8 pt-8 pb-6"
         style={{
           borderColor: "var(--color-border)",
           backgroundColor: "var(--color-surface)"
         }}
       >
-        <div className="flex w-full flex-col gap-2 px-8 py-6">
+        <div className="flex w-full flex-col gap-2">
           <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
             Learning Agent Workspace
           </h1>
