@@ -10,10 +10,10 @@ A sophisticated autonomous agent system that learns from experience, orchestrate
 
 ## ✨ Features
 
-- **🎭 DeepAgents Framework**: Built on [deepagents](https://github.com/langchain-ai/deepagents) for sophisticated agent orchestration
+- **🎭 DeepAgents Framework**: Built on [the upstream deepagents project](https://github.com/langchain-ai/deepagents) for sophisticated agent orchestration, including subagents with their own graphs
 - **🐘 PostgreSQL Vector Storage**: Production-ready vector database with pgvector for semantic memory search
 - **🔄 Multi-Dimensional Learning**: Captures tactical, strategic, and meta-level insights from every execution
-- **⚡ Parallel Sub-Agents**: Four specialized sub-agents (learning-query, execution-specialist, reflection-analyst, planning-strategist)
+- **⚡ Parallel Sub-Agents**: Two specialized sub-agents (execution-specialist, research-agent)
 - **🐍 Python Sandbox**: Secure code execution with Pyodide WebAssembly environment
 - **📊 Visualization Support**: Automatic capture of matplotlib plots, PIL images, and pandas DataFrames
 - **🌐 REST API Server**: FastAPI endpoints for memory retrieval and pattern analysis (port 8001)
@@ -193,13 +193,10 @@ graph TD
 
     Tools --> PT[Planning Tool - write_todos]
     Tools --> FS[File System - read/write/edit]
-    Tools --> LT[Learning Tools]
     Tools --> PS[Python Sandbox - code execution]
 
-    SubAgents --> LQ[learning-query]
     SubAgents --> ES[execution-specialist]
-    SubAgents --> RA[reflection-analyst]
-    SubAgents --> PS[planning-strategist]
+    SubAgents --> RS[research-agent]
 
     Agent -->|Background Learning| NL[NarrativeLearner]
     NL -->|Stores| PG[(PostgreSQL + pgvector :5433)]
@@ -218,11 +215,23 @@ graph TD
 - **FastAPI Server** (Port 8001): REST API for memory retrieval and pattern analysis
 - **LangGraph Server** (Port 2024): Serves the agent as an API endpoint
 - **PostgreSQL + pgvector** (Port 5433): Production-ready vector database for semantic search
-- **DeepAgents Agent**: Core agent built with `create_deep_agent()` that directly integrates learning
+- **DeepAgents Agent**: Core agent built with `create_deep_agent()` that directly integrates learning. The research workflow is implemented as a dedicated subagent graph that streams atomic browser actions.
+
+### Browser Research (Playwright + MCP)
+
+- The agent exposes browser tools via an MCP stdio server implemented with Playwright (no browser-use dependency). Subagents rely on `research_extract_structured_data` to fetch filtered, paginated HTML snippets instead of streaming entire pages.
+- The main agent is restricted from calling these tools directly; browsing is delegated via `task(agent_name="research-agent")` to a dedicated subagent graph.
+- Each tool returns a small JSON payload with `action`, `status`, and `url` so the UI can stream per-step provenance.
+- When running custom scripts, call `await shutdown_mcp_browser()` (or `shutdown_mcp_browser_sync()`) during teardown to close the shared Playwright session cleanly.
+
+Enable in Docker using the `browser` extra (already installed in Dockerfile.server). Configure via `.env`:
+
+- `BROWSER_HEADLESS=true`
+- `BROWSER_VIEWPORT_WIDTH=1280`, `BROWSER_VIEWPORT_HEIGHT=720`
 - **Python Sandbox**: Pyodide-based WebAssembly environment for safe code execution with visualization support
 - **NarrativeLearner**: Background processor that converts conversations into multi-dimensional learnings
 - **Specialized Sub-Agents**: Four agents for different execution aspects
-- **Learning Tools**: Memory search, pattern application, and learning queue management
+- **Learning-aware Orchestration**: Learning happens automatically after each run; no dedicated learning tools are exposed to the agent
 
 ## 🌐 API Server
 

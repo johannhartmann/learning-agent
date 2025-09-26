@@ -35,11 +35,12 @@ def test_mcp_browser_end_to_end_via_server() -> None:
 
     # 2) Instruct the agent to use browser tools deterministically
     prompt = (
-        "Use the browser tools to navigate and extract information.\n"
+        "Delegate browsing to the research subagent and use its tools.\n"
         "Steps:\n"
-        "1) Use go_to_url to open 'http://localhost:8001/api/testpage' (internal test page).\n"
-        "2) Use extract_structured_data with the query: 'the exact page title text'.\n"
-        "3) Use done when finished."
+        "1) Call task(subagent_type=\"research-agent\") to open a browsing context.\n"
+        "2) Use research_goto to open 'http://localhost:8001/api/testpage' (internal test page).\n"
+        "3) Use research_extract_structured_data with the query 'page title' to read the exact page title text (one call is enough).\n"
+        "4) Conclude with a brief synthesis and a bulleted Sources section as your final assistant message (do not call any completion tool)."
     )
     run_req = {
         "assistant_id": "learning_agent",

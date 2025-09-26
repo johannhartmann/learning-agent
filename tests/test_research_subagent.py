@@ -1,4 +1,7 @@
-from learning_agent.agent import create_learning_agent
+import pytest
+from langchain_core.messages import AIMessage
+
+from learning_agent.agent import create_learning_agent, _normalize_subagent_output
 from learning_agent.subagents import LEARNING_SUBAGENTS
 
 
@@ -12,3 +15,13 @@ def test_agent_builds_with_research_subagent():
     agent = create_learning_agent()
     assert agent is not None
 
+
+def test_normalize_subagent_output_wraps_message():
+    output = _normalize_subagent_output("research-agent", AIMessage(content="done"))
+    assert output["messages"] and isinstance(output["messages"][0], AIMessage)
+    assert output["files"] == {}
+
+
+def test_normalize_subagent_output_rejects_unknown_type():
+    with pytest.raises(RuntimeError):
+        _normalize_subagent_output("research-agent", object())
