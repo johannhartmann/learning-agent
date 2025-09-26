@@ -60,6 +60,7 @@ export default function HomePage() {
             instructions="You are the Learning Agent. Maintain the todo list in state.todos, capture artifacts in state.files, and update memories, patterns, and learning_queue as you reflect. When you generate code, images, or other artifacts, include them in your response using markdown code blocks or image syntax."
             labels={{ title: "Learning Agent", initial: "What should we tackle?" }}
             showResponseButton={true}
+            showDevConsole={false}
           />
         </div>
         <aside className="flex w-full max-w-md flex-col gap-4">
