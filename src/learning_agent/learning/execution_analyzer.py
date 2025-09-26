@@ -59,15 +59,14 @@ class ExecutionAnalyzer:
 
     def _extract_tool_calls(self, content: str) -> None:
         """Extract tool calls from message content."""
-        # Common tool patterns
+        # Common tool patterns that remain in the agent
         tool_patterns = [
-            r"search_memory",
             r"write_todos",
             r"read_file",
             r"write_file",
             r"edit_file",
             r"ls",
-            r"queue_learning",
+            r"python_sandbox",
             r"task",
         ]
 
@@ -114,7 +113,7 @@ class ExecutionAnalyzer:
             }
             for i in range(1, len(self.tool_sequence))
             if self.tool_sequence[i] == "ls"
-            and self.tool_sequence[i - 1] in ["write_todos", "search_memory"]
+            and self.tool_sequence[i - 1] in ["write_todos"]
         ]
         redundancies.extend(unnecessary_ls)
 
@@ -124,14 +123,14 @@ class ExecutionAnalyzer:
         """Identify inefficient tool usage patterns."""
         inefficiencies: list[dict[str, Any]] = []
 
-        # Check if search_memory was called first (best practice)
-        if self.tool_sequence and self.tool_sequence[0] != "search_memory":
+        # Check if planning was skipped at the start (write_todos)
+        if self.tool_sequence and self.tool_sequence[0] != "write_todos":
             inefficiencies.append(
                 {
-                    "type": "no_initial_search",
+                    "type": "no_initial_plan",
                     "first_tool": self.tool_sequence[0] if self.tool_sequence else None,
-                    "impact": "Missed learning from past experiences",
-                    "suggestion": "Always start with search_memory for similar tasks",
+                    "impact": "Jumped into execution without planning",
+                    "suggestion": "Start with write_todos to outline the approach",
                 }
             )
 
@@ -183,35 +182,24 @@ class ExecutionAnalyzer:
                 }
             )
 
-        # Look for independent searches
-        search_count = self.tool_counts.get("search_memory", 0)
-        if search_count > 1:
-            opportunities.append(
-                {
-                    "type": "multiple_searches",
-                    "count": search_count,
-                    "suggestion": "Multiple searches could be parallelized",
-                }
-            )
-
         return opportunities
 
     def _extract_patterns(self) -> dict[str, Any]:
         """Extract execution patterns from the tool sequence."""
+        starts_with_plan = self.tool_sequence[0] == "write_todos" if self.tool_sequence else False
+
         patterns = {
-            "starts_with_search": self.tool_sequence[0] == "search_memory"
-            if self.tool_sequence
-            else False,
+            "starts_with_plan": starts_with_plan,
             "uses_todos": "write_todos" in self.tool_counts,
             "delegates_to_subagent": "task" in self.tool_counts,
-            "learns_from_execution": "queue_learning" in self.tool_counts,
+            "uses_python_sandbox": "python_sandbox" in self.tool_counts,
             "dominant_tool": self.tool_counts.most_common(1)[0][0] if self.tool_counts else None,
             "tool_diversity": len(self.tool_counts) / max(sum(self.tool_counts.values()), 1),
         }
 
         # Identify workflow pattern
-        if patterns["starts_with_search"] and patterns["uses_todos"]:
-            patterns["workflow_pattern"] = "search_plan_execute"
+        if patterns["starts_with_plan"] and patterns["delegates_to_subagent"]:
+            patterns["workflow_pattern"] = "plan_delegate_execute"
         elif patterns["uses_todos"]:
             patterns["workflow_pattern"] = "plan_execute"
         else:
@@ -240,9 +228,9 @@ class ExecutionAnalyzer:
         score -= min(parallel_missed * 0.1, 0.2)
 
         # Bonus for good practices
-        if self.tool_sequence and self.tool_sequence[0] == "search_memory":
+        if self.tool_sequence and self.tool_sequence[0] == "write_todos":
             score += 0.1
-        if "queue_learning" in self.tool_counts:
+        if "python_sandbox" in self.tool_counts:
             score += 0.05
 
         return max(0.0, min(1.0, score))
@@ -260,14 +248,14 @@ class ExecutionAnalyzer:
             return "No tools used"
 
         # Common patterns
-        if sequence[:2] == ["search_memory", "write_todos"]:
-            return "Learn-then-plan pattern (recommended)"
         if sequence[0] == "write_todos":
-            return "Plan-first pattern (skipped learning)"
+            return "Plan-first pattern (recommended)"
+        if sequence[0] == "python_sandbox":
+            return "Sandbox-first pattern (experimentation before planning)"
         if sequence[0] == "read_file":
-            return "Explore-first pattern (no context gathering)"
+            return "Explore-first pattern (no initial plan)"
         if sequence.count("write_todos") > 5:
             return "Over-planning pattern (excessive todo updates)"
-        if "search_memory" not in sequence:
-            return "No-learning pattern (missed past experiences)"
+        if "write_todos" not in sequence:
+            return "Execution-first pattern (skipped planning)"
         return "Custom pattern"
