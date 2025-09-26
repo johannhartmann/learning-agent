@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "GitHub MCP Server": {
+      "command": "bash",
+      "args": [
+        "-lc",
+        "set -euo pipefail; REPO=$(git -C \"$PWD\" remote get-url origin 2>/dev/null | sed -E 's#(git@|https?://)([^/:]+)[:/](.+?)(\\.git)?$#\\3#' || true); if [ -z \"${REPO:-}\" ] && [ -n \"${GITHUB_REPOSITORY:-}\" ]; then REPO=\"$GITHUB_REPOSITORY\"; fi; if [ -z \"${REPO:-}\" ]; then echo 'Failed to detect current Git repository. Ensure `git remote origin` is set or define GITHUB_REPOSITORY (owner/repo).' >&2; exit 1; fi; docker run -i --rm --pull always -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server --repositories \"$REPO\""
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

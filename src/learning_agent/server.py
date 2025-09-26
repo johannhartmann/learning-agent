@@ -8,16 +8,12 @@ the LangGraph API in-process (no external platform/Redis required).
 import importlib
 import importlib.util
 import os
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from langgraph.graph import END, StateGraph
 
 from learning_agent.agent import create_learning_agent
 from learning_agent.state import LearningAgentState
-
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from collections.abc import Callable
 
 
 print(
@@ -32,6 +28,19 @@ print(
 )
 PostgresSaver = None  # type: ignore[assignment]
 SQLAlchemySaver = None  # type: ignore[assignment]
+
+# Print deepagents module info for sanity at startup
+try:  # pragma: no cover - startup diagnostics
+    import inspect as _inspect
+
+    import deepagents  # type: ignore
+    from deepagents.sub_agent import _create_task_tool as _da_task  # type: ignore
+
+    print("[deepagents] module:", getattr(deepagents, "__file__", None), flush=True)
+    _src = _inspect.getsource(_da_task)
+    print("[deepagents] task tool contains graph handoff=", ("graph=" in _src), flush=True)
+except Exception as _e:  # pragma: no cover - best effort
+    print("[deepagents] diagnostics failed:", repr(_e), flush=True)
 
 
 def _try_import(name: str):  # pragma: no cover - helper
@@ -83,31 +92,14 @@ for _name in _sql_modules:
 
 
 def create_graph() -> Any:
-    """Create the LangGraph graph for the learning agent with automatic learning and A2A support.
-
-    Returns:
-        Compiled LangGraph graph ready to be served with streaming, A2A, and automatic learning
-    """
+    """Create the LangGraph graph for the learning agent with automatic learning."""
     # Get the base deepagents agent
     from typing import cast
 
     agent = create_learning_agent()
 
-    # Create a wrapper graph that adds automatic learning submission and A2A support
+    # Create a wrapper graph that adds automatic learning submission
     workflow = StateGraph(LearningAgentState)
-
-    # A2A preprocessing node - handles incoming A2A requests
-    async def a2a_preprocessor(state: LearningAgentState) -> dict[str, Any]:
-        """Process incoming A2A requests if present."""
-        from learning_agent.a2a_handler import process_a2a_request
-
-        # Check if this is an A2A request (has jsonrpc field)
-        if isinstance(state, dict) and "jsonrpc" in state:
-            # Process as A2A request
-            return await process_a2a_request(state, state)
-
-        # Not an A2A request, pass through
-        return state
 
     # IMPORTANT: Add the agent graph directly to preserve streaming events.
     # Wrapping the agent in an async function (await agent.ainvoke) collapses
@@ -158,13 +150,11 @@ def create_graph() -> Any:
         return state
 
     # Add nodes to the graph
-    workflow.add_node("a2a_preprocessor", a2a_preprocessor)
-    workflow.add_node("agent", cast(Any, agent))
+    workflow.add_node("agent", cast("Any", agent))
     workflow.add_node("submit_learning", submit_learning_node)
 
     # Define the flow
-    workflow.set_entry_point("a2a_preprocessor")
-    workflow.add_edge("a2a_preprocessor", "agent")
+    workflow.set_entry_point("agent")
     workflow.add_edge("agent", "submit_learning")
     workflow.add_edge("submit_learning", END)
 
@@ -206,47 +196,77 @@ def create_graph() -> Any:
 
 
 def _build_langgraph_app(graph: Any) -> Any:
-    """Attempt to construct a LangGraph API ASGI app for the given graph.
+    """Construct the official LangGraph API ASGI app with a default graph.
 
-    Tries multiple import paths to accommodate minor packaging differences.
+    This uses the standard create_app factory so the SDK-compatible routes
+    like /threads/{thread_id}/runs/stream and /threads/{thread_id}/state work
+    without proxy hacks or manual registration.
     """
-    create_app: Callable[..., Any] | None = None
+    # Prefer the official server factory
+    mod = _try_import("langgraph_api.server")
+    if mod and hasattr(mod, "create_app"):
+        create_app = mod.create_app
+        try:
+            app = create_app(graphs={"learning_agent": graph}, default_graph_id="learning_agent")
+            print(
+                "[server] Using create_app(graphs=..., default_graph_id=learning_agent)", flush=True
+            )
+        except TypeError:
+            app = create_app(graphs={"learning_agent": graph})
+            print("[server] Using create_app(graphs=...)", flush=True)
+    else:
+        # Fallback: use module.app and register graph on lifespan
+        if not mod or not hasattr(mod, "app"):
+            raise RuntimeError(
+                "langgraph_api.server.create_app not available and module.app missing"
+            )
+        app = mod.app
+        print("[server] Using module.app from langgraph_api.server", flush=True)
+        # Register graph during lifespan
+        try:
+            from contextlib import asynccontextmanager
 
-    # Ensure langgraph_api can import without failing on missing env
-    # Prefer a plain Postgres URI for the platform's expected config
-    default_plain = (
-        "postgresql://learning_agent:learning_agent_pass@postgres:5432/learning_memories"
-    )
-    db_plain = os.environ.get("DATABASE_URI") or os.environ.get("DATABASE_URL") or default_plain
-    os.environ.setdefault("DATABASE_URI", db_plain)
-    os.environ.setdefault("LANGGRAPH_RUNTIME_EDITION", "postgres")
-    os.environ.setdefault("REDIS_URI", os.environ.get("REDIS_URI", "memory://"))
+            import langgraph_api.graph as api_graph  # type: ignore
 
-    # Try the common import paths for langgraph-api
-    app = None
-    for mod_path in (
-        "langgraph_api.server",
-        "langgraph_api",
-        "langgraph_server",
-    ):
-        mod = _try_import(mod_path)
-        if mod is None:
-            continue
-        # Preferred: a factory
-        create_app = getattr(mod, "create_app", None)
-        if callable(create_app):
-            print(f"[server] Using create_app from: {mod_path}", flush=True)
-            app = create_app(graphs={"learning_agent": graph})  # type: ignore[call-arg]
-            break
-        # Fallback: module exports a prebuilt Starlette app
-        module_app = getattr(mod, "app", None)
-        if module_app is not None:
-            print(f"[server] Using module.app from: {mod_path}", flush=True)
-            app = module_app
-            break
+            original_lifespan = getattr(app.router, "lifespan_context", None)
 
-    if app is None:
-        raise RuntimeError("Could not obtain ASGI app from langgraph-api")
+            @asynccontextmanager
+            async def combined_lifespan(a):  # type: ignore
+                if original_lifespan:
+                    cm = original_lifespan(a)
+                else:
+
+                    @asynccontextmanager
+                    async def _noop(_):
+                        yield
+
+                    cm = _noop(a)
+                async with cm:
+                    try:
+                        await api_graph.register_graph(
+                            graph_id="learning_agent", graph=graph, config=None
+                        )
+                        print(
+                            "[server] Registered graph 'learning_agent' with langgraph_api runtime",
+                            flush=True,
+                        )
+                    except Exception as e:
+                        print(f"[server] Graph registration failed: {e}", flush=True)
+                    try:
+                        yield
+                    finally:
+                        try:
+                            from learning_agent.tools.mcp_browser import shutdown_mcp_browser
+
+                            await shutdown_mcp_browser()
+                        except Exception as shutdown_exc:
+                            print(
+                                f"[server] MCP browser shutdown failed: {shutdown_exc}", flush=True
+                            )
+
+            app.router.lifespan_context = combined_lifespan
+        except Exception as e:
+            print(f"[server] Failed to set lifespan registration: {e}", flush=True)
 
     # Add permissive CORS for local UI/dev usage
     try:
@@ -258,59 +278,12 @@ def _build_langgraph_app(graph: Any) -> Any:
     except Exception:
         pass
 
-    # Add a simple health endpoint used by docker-compose healthcheck
+    # Health endpoint
     try:
-        # FastAPI-compatible
         if hasattr(app, "get"):
-            app.get("/health")(lambda: {"status": "ok"})  # type: ignore[misc]
-        else:
-            # Starlette-compatible
-            from starlette.responses import JSONResponse  # type: ignore
-
-            def _health(_request):  # type: ignore
-                return JSONResponse({"status": "ok"})
-
-            if hasattr(app, "add_route"):
-                app.add_route("/health", _health)  # type: ignore[attr-defined]
+            app.get("/ok")(lambda: {"status": "ok"})  # type: ignore[misc]
     except Exception:
         pass
-
-    # Register our compiled graph during app lifespan (event loop available)
-    try:
-        from contextlib import asynccontextmanager
-
-        import langgraph_api.graph as api_graph  # type: ignore
-
-        graph_id = os.environ.get("NEXT_PUBLIC_AGENT_ID", "learning_agent")
-
-        original_lifespan = getattr(app.router, "lifespan_context", None)
-
-        @asynccontextmanager
-        async def combined_lifespan(a):  # type: ignore
-            if original_lifespan:
-                cm = original_lifespan(a)
-            else:
-                # dummy context manager
-                @asynccontextmanager
-                async def _noop(_):
-                    yield
-
-                cm = _noop(a)
-
-            async with cm:
-                try:
-                    await api_graph.register_graph(graph_id=graph_id, graph=graph, config=None)
-                    print(
-                        f"[server] Registered graph '{graph_id}' with langgraph_api runtime",
-                        flush=True,
-                    )
-                except Exception as e:
-                    print(f"[server] Graph registration failed: {e}", flush=True)
-                yield
-
-        app.router.lifespan_context = combined_lifespan
-    except Exception as e:  # pragma: no cover - best-effort registration
-        print(f"[server] Failed to set lifespan registration: {e}", flush=True)
 
     return app
 

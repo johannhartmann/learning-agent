@@ -71,7 +71,7 @@ def get_chat_model(config: Any) -> BaseChatModel:
     # Initialize the chat model using LangChain's factory
     try:
         model = cast(
-            BaseChatModel,
+            "BaseChatModel",
             init_chat_model(
                 model=config.llm_model,
                 model_provider=config.llm_provider,

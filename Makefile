@@ -26,6 +26,9 @@ restart: ## Restart Docker containers
 logs: ## View server logs
 	docker compose logs -f server
 
+ui-e2e: ## Run UI Playwright E2E tests (uses ui-test container)
+	OPENAI_API_KEY=$${OPENAI_API_KEY} docker compose run --rm ui-test
+
 
 reset: ## Force recreate server (clean bring-up)
 	- docker compose rm -fs server test || true

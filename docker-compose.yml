@@ -110,6 +110,7 @@ services:
 
   # UI End-to-end tests using Microsoft Playwright container
   ui-test:
+    profiles: ["test"]
     image: mcr.microsoft/playwright:v1.47.0-jammy
     container_name: learning-agent-ui-test
     working_dir: /app/ui

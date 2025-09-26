@@ -38,5 +38,9 @@ class LearningAgentState(DeepAgentState):  # type: ignore[misc]
     # Use Annotated with operator.add to handle concurrent updates
     sandbox_error_history: NotRequired[Annotated[list[dict[str, str]], operator.add]]  # type: ignore[valid-type]
 
-    # Store sandbox-generated files as base64-encoded data for session isolation
-    files: NotRequired[dict[str, str]]  # type: ignore[valid-type]
+    # Inherit `files` aggregation behavior from DeepAgentState (file_reducer merges dicts)
+
+    # Optional fields produced by downstream nodes/tools that aren't part of the core schema
+    # Adding them here avoids "unknown channel" warnings in LangGraph when nodes pass state through
+    remaining_steps: NotRequired[int]  # type: ignore[valid-type]
+    thread_id: NotRequired[str]  # type: ignore[valid-type]

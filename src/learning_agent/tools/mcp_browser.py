@@ -110,8 +110,24 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
 
         async def _load() -> list[Any]:
             client = MultiServerMCPClient({"browser": server_cfg})
-            tools = await client.get_tools()
-            return list(tools)
+            tools = list(await client.get_tools())
+
+            # Wrap/rename tools to enforce a research_* namespace. This makes it
+            # clearer that these are intended for the research subagent.
+            wrapped: list[Any] = []
+            for t in tools:
+                try:
+                    name = getattr(t, "name", None) or ""
+                    # LangChain tools typically have .name and are callable via .invoke/__call__.
+                    # We rebuild a simple wrapper if possible.
+                    if hasattr(t, "name") and hasattr(t, "invoke"):
+                        t.name = f"research_{name}"
+                        wrapped.append(t)
+                    else:
+                        wrapped.append(t)
+                except Exception:
+                    wrapped.append(t)
+            return wrapped
 
         # Synchronously load tools at startup time.
         # Use a dedicated thread + event loop to avoid conflicts with any running loop.

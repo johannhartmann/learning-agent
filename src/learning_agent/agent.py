@@ -1,16 +1,26 @@
 """Main learning agent using deepagents framework."""
 
 import logging
+from collections.abc import Mapping, Sequence
+from html.parser import HTMLParser
 from pathlib import Path
+from typing import Annotated, Any
 
-from deepagents import create_deep_agent
+from deepagents.graph import base_prompt
+from deepagents.prompts import TASK_DESCRIPTION_PREFIX, TASK_DESCRIPTION_SUFFIX
 from deepagents.tools import edit_file, ls, read_file, write_file, write_todos
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.tools import BaseTool, InjectedToolCallId, tool
+from langgraph.config import get_stream_writer
+from langgraph.prebuilt import InjectedState, create_react_agent
+from langgraph.types import Command
 
 from learning_agent.config import settings
 from learning_agent.learning.tools import create_learning_tools
 from learning_agent.providers import get_chat_model
 from learning_agent.state import LearningAgentState
-from learning_agent.subagents import LEARNING_SUBAGENTS
+from learning_agent.stream_adapter import StreamAdapter, coerce_to_dict
+from learning_agent.subagents import build_learning_subagents
 from learning_agent.tools.mcp_browser import create_mcp_browser_tools
 from learning_agent.tools.sandbox_tool import create_sandbox_tool
 
@@ -33,47 +43,35 @@ LEARNING_AGENT_INSTRUCTIONS = """You are a sophisticated AUTONOMOUS learning age
 ## Core Capabilities
 You are an autonomous agent that learns from every task execution to become more effective over time. You have access to:
 
-1. **Deep Memory Search**: Find multi-dimensional learnings from similar past tasks using `search_memory`
-   - Returns tactical learnings (specific implementation details)
-   - Returns strategic learnings (high-level patterns)
-   - Returns meta-learnings (insights about the learning process)
-   - Returns anti-patterns (what NOT to do)
-   - Shows execution efficiency scores and confidence levels
-2. **Python Sandbox**: Execute Python code safely using `python_sandbox`
+1. **Python Sandbox**: Execute Python code safely using `python_sandbox`
    - Run data analysis, algorithms, and calculations in isolated environment
    - Automatically captures matplotlib plots and PIL images as base64
    - Maintains state across executions (imports, variables persist)
    - Perfect for testing code before writing to files
-3. **Task Orchestration**: Use sub-agents via the `task` tool for specialized work
-4. **Learning Queue**: Queue experiences for explicit learning with `queue_learning` (most learning is automatic)
-5. **Planning**: Use `write_todos` to create detailed execution plans
+2. **Task Orchestration**: Use sub-agents via the `task` tool for specialized work
+3. **Planning**: Use `write_todos` to create detailed execution plans
+
+## Web Research Permissions
+- You ARE allowed to browse external websites and local service URLs during research.
+- Delegate via the `task` tool to the `research-agent` for any browsing tasks. The research subagent streams each action (navigate, extract) with URL provenance.
+- When a user asks for a screenshot or image of a webpage, delegate to the research-agent and use its `research_screenshot` tool. Include the returned PNG (base64 or saved file) in your reply.
 
 ## Your Sub-Agents
 You can delegate work to specialized sub-agents using the `task` tool:
 
-- **learning-query**: Search memories and find applicable patterns for current tasks
-- **execution-specialist**: Execute complex tasks with parallel orchestration
-- **reflection-analyst**: Perform deep reflection on completed tasks
-- **planning-strategist**: Create strategic plans incorporating learned patterns
+- **research-agent**: Perform deep web research with MCP browser tools, stream interim findings, and cite sources
 
-## Agent-to-Agent Communication (A2A)
-You can communicate with other agents using the `send_a2a_message` tool:
-- Use this to collaborate with specialized agents for specific domains
-- Send clear, context-rich messages with specific requests
-- Include relevant state information when needed
-- Wait for responses before proceeding with dependent tasks
-- Example: send_a2a_message(agent_name="data-analyst", message="Analyze this dataset for patterns: ...")
+### Delegating to the research-agent
+- Use `task(subagent_type="research-agent")` with a clear subtask to hand off browsing
+- Provide constraints (timebox, domains) and expected outputs (e.g., “brief + sources”)
+- The research-agent streams interim findings and ends with a short synthesis and a Sources list as a final assistant message (no tool call on completion)
+- Delegate at most ONCE per user request unless the user explicitly asks for additional research; after a research handoff completes, synthesize and provide the final answer without re-delegating.
 
 ## Deep Learning Workflow
 For each task you should:
 
-1. **Search Past Experience**: Use `search_memory` with the current task to find deep learnings:
-   - Pay attention to tactical learnings for implementation specifics
-   - Apply strategic learnings for overall approach
-   - Consider meta-learnings to improve your learning process
-   - AVOID anti-patterns that were identified in past executions
-   - Trust high-confidence learnings (>70%) and apply them automatically
-2. **Plan with Learning**: Use `write_todos` incorporating all dimensions of past learnings
+1. **Understand the Goal**: Review the user request and any available context before acting.
+2. **Plan**: Use `write_todos` to break the work into executable steps.
 3. **EXECUTE THE PLAN**: After creating todos, IMMEDIATELY start working through them:
    - Mark first todo as in_progress with `write_todos`
    - Use the appropriate tools (write_file, edit_file, ls, read_file) to complete it
@@ -88,11 +86,9 @@ Note: Deep learning happens automatically after each conversation, analyzing:
 - Anti-patterns and inefficiencies to avoid
 
 ## Key Principles
-- Always start by searching for relevant past experiences using the current task
 - Use `write_todos` early and often to track progress
-- Learning happens automatically - only use `queue_learning` for explicit insights
 - Delegate complex analysis to specialized sub-agents
-- Be proactive in applying learnings from similar tasks
+- Be proactive in applying lessons from completed work
 
 ## File Operations
 You have access to standard file operations:
@@ -102,10 +98,29 @@ You have access to standard file operations:
 - `edit_file`: Make precise edits to existing files
 
 ## Planning and Execution
-- Break complex tasks into clear, actionable steps using `write_todos`
-- **CRITICAL**: After creating todos, YOU MUST EXECUTE THEM - the todo list is just for planning
+- For any non-trivial or multi-step task (building code, creating multiple files, extended analysis), your FIRST ACTION MUST be a `write_todos` call that breaks down the work.
+- **CRITICAL**: After creating todos, YOU MUST EXECUTE THEM — the todo list is just for planning
 - Execute each todo item using the appropriate tools (write_file, edit_file, etc.)
 - Update todo status as you complete each task (pending → in_progress → completed)
+
+### Tool Usage Examples
+Use these examples as patterns — adapt content to the task at hand.
+
+- Plan with todos (first action for multi-step work):
+  - Tool: `write_todos`
+  - Args example:
+    ```json
+    {
+      "items": [
+        {"title": "Set up project structure", "status": "pending"},
+        {"title": "Implement core logic", "status": "pending"},
+        {"title": "Write tests", "status": "pending"}
+      ]
+    }
+    ```
+- Execute a todo item:
+  - Tool: `write_file` / `edit_file`
+  - Keep the todo list in sync using `write_todos` (mark in_progress → completed)
 - Use parallel execution when tasks are independent
 - The todo list helps you track progress but YOU must do the actual work
 
@@ -153,6 +168,103 @@ Remember: Your goal is not just to complete tasks, but to learn from each execut
 CRITICAL: The `write_todos` tool ONLY tracks progress - YOU must use write_file, edit_file, etc. to actually DO the work!"""
 
 
+def _normalize_subagent_output(subagent_type: str, output: Any) -> dict[str, Any]:  # noqa: ARG001
+    if isinstance(output, BaseMessage):
+        normalized: dict[str, Any] = {
+            "messages": [output],
+            "files": {},
+        }
+    elif isinstance(output, list) and all(isinstance(msg, BaseMessage) for msg in output):
+        normalized = {
+            "messages": list(output),
+            "files": {},
+        }
+    elif isinstance(output, dict):
+        normalized = dict(output)
+    else:
+        normalized = coerce_to_dict(output)
+
+    messages = normalized.get("messages", [])
+    if isinstance(messages, BaseMessage):
+        normalized["messages"] = [messages]
+    elif isinstance(messages, list):
+        normalized["messages"] = list(messages)
+    elif messages is None:
+        normalized["messages"] = []
+    else:
+        normalized["messages"] = [messages]
+
+    files = normalized.get("files", {})
+    if not isinstance(files, dict):
+        normalized["files"] = {}
+
+    return normalized
+
+
+class _HeadlineParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self._current_href: str | None = None
+        self._buffer: list[str] = []
+        self.headlines: list[tuple[str, str]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "a":
+            return
+        href = dict(attrs).get("href")
+        if not href:
+            return
+        self._current_href = href
+        self._buffer = []
+
+    def handle_data(self, data: str) -> None:
+        if self._current_href is None:
+            return
+        stripped = data.strip()
+        if stripped:
+            self._buffer.append(stripped)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag != "a" or self._current_href is None:
+            return
+        text = " ".join(self._buffer).strip()
+        href = self._current_href
+        self._current_href = None
+        self._buffer = []
+        if not text:
+            return
+        if len(text) < 20:
+            return
+        lowered = text.lower()
+        if any(prefix in lowered for prefix in ("mehr", "weiter", "anzeige")):
+            return
+        if href.startswith("/"):
+            href = f"https://www.stern.de{href}"
+        self.headlines.append((text, href))
+
+
+def _summarize_research_extracts(extracts: list[str]) -> str:
+    parser = _HeadlineParser()
+    for snippet in extracts:
+        try:
+            parser.feed(snippet)
+        except Exception:
+            continue
+    seen: set[str] = set()
+    bullets: list[str] = []
+    for title, url in parser.headlines:
+        key = title.strip()
+        if key in seen:
+            continue
+        seen.add(key)
+        bullets.append(f"- [{title}]({url})")
+        if len(bullets) >= 5:
+            break
+    if not bullets:
+        return ""
+    return "Top findings:\n" + "\n".join(bullets)
+
+
 def create_learning_agent(
     storage_path: Path | None = None,
     model: str | None = None,
@@ -192,22 +304,12 @@ def create_learning_agent(
     # Create sandbox tool
     sandbox_tool = create_sandbox_tool()
 
-    # Import A2A tool if enabled
-    a2a_tools = []
-    if settings.enable_a2a:
-        try:
-            from learning_agent.tools.a2a_tool import send_a2a_message
-
-            a2a_tools = [send_a2a_message]
-            logger.info("A2A communication enabled")
-        except ImportError:
-            logger.warning("Could not import A2A tool, A2A communication disabled")
+    exclusive_tools: dict[str, list[Any]] = {}
 
     # Combine with deepagents built-in tools
-    all_tools = [
+    base_tools: list[BaseTool] = [
         *learning_tools,  # Learning-specific tools
         sandbox_tool,  # Python sandbox for safe code execution
-        *a2a_tools,  # Agent-to-Agent communication (if enabled)
         write_todos,  # Planning and task tracking
         ls,  # List directory contents
         read_file,  # Read file contents
@@ -215,21 +317,329 @@ def create_learning_agent(
         edit_file,  # Edit existing files
     ]
 
-    # Optionally add MCP browser-use tools (behind ENABLE_MCP_BROWSER flag)
+    # Optionally add MCP Playwright tools (dedicated to research subagent)
     try:
         mcp_browser_tools = create_mcp_browser_tools()
         if mcp_browser_tools:
-            all_tools.extend(mcp_browser_tools)
-            logger.info("MCP browser tools enabled")
+            exclusive_tools["research-agent"] = mcp_browser_tools
+            logger.info(
+                "MCP browser tools enabled for research-agent (count=%d)",
+                len(mcp_browser_tools),
+            )
     except Exception as e:  # pragma: no cover - optional path
         logger.warning(f"MCP browser tools unavailable: {e}")
 
-    # Create the agent
-    agent = create_deep_agent(
-        tools=all_tools,
-        instructions=LEARNING_AGENT_INSTRUCTIONS,
+    subagents = build_learning_subagents(
         model=llm,
-        subagents=LEARNING_SUBAGENTS,
+        tools=base_tools,
+        exclusive_tools=exclusive_tools,
+    )
+
+    def _create_async_task_tool(
+        tools: Sequence[BaseTool],
+        instructions: str,
+        subagent_defs: list[dict[str, Any]],
+        model: Any,
+        state_schema: type[LearningAgentState],
+    ) -> BaseTool:
+        agents: dict[str, Any] = {
+            "general-purpose": create_react_agent(
+                model,
+                prompt=instructions,
+                tools=tools,
+                state_schema=state_schema,
+            )
+        }
+
+        tool_registry: dict[str, BaseTool] = {}
+        for tool_obj in tools:
+            if not isinstance(tool_obj, BaseTool):
+                tool_obj = tool(tool_obj)
+            tool_registry[tool_obj.name] = tool_obj
+
+        for definition in subagent_defs:
+            name = definition["name"]
+            if graph := definition.get("graph"):
+                agents[name] = graph
+                continue
+
+            requested_tools = definition.get("tools", []) or []
+            resolved_tools: list[BaseTool]
+            if requested_tools:
+                resolved_tools = [tool_registry[t] for t in requested_tools if t in tool_registry]
+                if not resolved_tools:
+                    logger.warning(
+                        "Subagent '%s' requested tools %s but none were available",
+                        name,
+                        requested_tools,
+                    )
+                    resolved_tools = list(tools)
+            else:
+                resolved_tools = list(tools)
+
+            agents[name] = create_react_agent(
+                model,
+                prompt=definition["prompt"],
+                tools=resolved_tools,
+                state_schema=state_schema,
+            )
+
+        other_agents = [f"- {s['name']}: {s['description']}" for s in subagent_defs]
+
+        @tool(
+            description=TASK_DESCRIPTION_PREFIX.format(other_agents=other_agents)
+            + TASK_DESCRIPTION_SUFFIX
+        )
+        async def task(
+            description: str,
+            subagent_type: str,
+            state: Annotated[LearningAgentState, InjectedState],
+            tool_call_id: Annotated[str, InjectedToolCallId],
+        ) -> Command:
+            if subagent_type not in agents:
+                allowed = ", ".join(f"`{name}`" for name in agents)
+                return Command(
+                    update={
+                        "messages": [
+                            ToolMessage(
+                                content=(
+                                    f"Error: invoked agent of type {subagent_type}; "
+                                    f"allowed types are {allowed}"
+                                ),
+                                tool_call_id=tool_call_id,
+                            )
+                        ]
+                    }
+                )
+
+            sub_agent = agents[subagent_type]
+            sub_state = dict(state)
+            sub_state["messages"] = [{"role": "user", "content": description}]
+
+            try:
+                writer = get_stream_writer()
+            except Exception:  # pragma: no cover - streaming not enabled
+                writer = None
+
+            final_output: dict[str, Any] | None = None
+            fallback_output: dict[str, Any] | None = None
+            last_ai_message: BaseMessage | None = None
+            saw_completion_signal = False
+
+            stream_adapter: StreamAdapter | None = None
+            if writer is not None:
+                stream_adapter = StreamAdapter(
+                    writer,
+                    agent_label=subagent_type,
+                    parent_id=tool_call_id,
+                    profile="user",
+                )
+                stream_adapter.begin(
+                    {
+                        "description": description,
+                        "subagent": subagent_type,
+                    }
+                )
+                writer(
+                    {
+                        "subagent": subagent_type,
+                        "event": "start",
+                        "description": description,
+                    }
+                )
+
+            async def _handle_stream_event(event: dict[str, Any]) -> None:
+                if writer is None:
+                    return
+                event_type = event.get("event")
+                name = event.get("name")
+
+                if event_type == "on_tool_start":
+                    writer(
+                        {
+                            "subagent": subagent_type,
+                            "event": "tool_start",
+                            "tool": name,
+                        }
+                    )
+                elif event_type == "on_tool_end":
+                    writer(
+                        {
+                            "subagent": subagent_type,
+                            "event": "tool_end",
+                            "tool": name,
+                        }
+                    )
+                elif event_type == "on_chain_end" and name == "LangGraph":
+                    writer(
+                        {
+                            "subagent": subagent_type,
+                            "event": "finish",
+                        }
+                    )
+
+            try:
+                async for event in sub_agent.astream_events(
+                    sub_state,
+                    version="v2",
+                ):
+                    event_type = event.get("event")
+                    name = event.get("name")
+                    raw_data = event.get("data")
+                    data = coerce_to_dict(raw_data) if raw_data is not None else {}
+
+                    if stream_adapter is not None:
+                        stream_adapter.accept(event)
+
+                    await _handle_stream_event(event)
+
+                    if event_type == "on_chain_end":
+                        output = data.get("output")
+                        if output is None and hasattr(raw_data, "output"):
+                            output = raw_data.output
+
+                        if name == "LangGraph" and output is not None:
+                            if isinstance(output, dict | list | BaseMessage):
+                                final_output = output
+                            else:
+                                coerced_output = coerce_to_dict(output)
+                                final_output = coerced_output or output
+                        elif fallback_output is None and output is not None:
+                            candidate = (
+                                output if isinstance(output, Mapping) else coerce_to_dict(output)
+                            )
+                            if isinstance(candidate, Mapping) and candidate.get("messages"):
+                                fallback_output = dict(candidate)
+                    elif event_type == "on_chat_model_end":
+                        output_payload = data.get("output")
+                        if output_payload is None and hasattr(raw_data, "output"):
+                            output_payload = raw_data.output
+
+                        if isinstance(output_payload, Mapping):
+                            generations = output_payload.get("generations", [])
+                        else:
+                            generations = getattr(output_payload, "generations", [])
+
+                        first_generation: Any | None = None
+                        if isinstance(generations, Sequence) and generations:
+                            first_group = generations[0]
+                            if isinstance(first_group, Sequence) and first_group:
+                                first_generation = first_group[0]
+                            else:
+                                first_generation = first_group
+
+                        if first_generation is not None:
+                            if isinstance(first_generation, Mapping):
+                                message = first_generation.get("message")
+                            else:
+                                message = getattr(first_generation, "message", None)
+                            if isinstance(message, BaseMessage):
+                                last_ai_message = message
+
+                    if event_type == "on_tool_start" and name == "research_done":
+                        saw_completion_signal = True
+                    if event_type == "on_tool_end" and name == "research_done":
+                        saw_completion_signal = True
+
+            except Exception as exc:
+                if stream_adapter is not None:
+                    stream_adapter.emit_warning(str(exc))
+                    stream_adapter.complete({"error": str(exc)}, status="error")
+                if writer is not None:
+                    writer(
+                        {
+                            "subagent": subagent_type,
+                            "event": "error",
+                            "error": str(exc),
+                        }
+                    )
+                raise
+
+            if final_output is None:
+                if fallback_output is not None:
+                    final_output = fallback_output
+                elif last_ai_message is not None:
+                    final_output = {"messages": [last_ai_message]}
+
+            if final_output is None:
+                raise RuntimeError(f"Subagent '{subagent_type}' did not return a final state")
+
+            normalized_output = _normalize_subagent_output(subagent_type, final_output)
+
+            if stream_adapter is not None:
+                if subagent_type == "research-agent" and not saw_completion_signal:
+                    stream_adapter.emit_synthetic_completion(
+                        "research_done",
+                        normalized_output,
+                    )
+                transcript = stream_adapter.get_transcript()
+                if transcript:
+                    messages_list = normalized_output.setdefault("messages", [])
+                    messages_list.append(AIMessage(content=transcript))
+                stream_adapter.complete(normalized_output)
+            if (
+                writer is not None
+                and subagent_type == "research-agent"
+                and not saw_completion_signal
+            ):
+                writer(
+                    {
+                        "subagent": subagent_type,
+                        "event": "tool_start",
+                        "tool": "research_done",
+                        "synthetic": True,
+                    }
+                )
+                writer(
+                    {
+                        "subagent": subagent_type,
+                        "event": "tool_end",
+                        "tool": "research_done",
+                        "synthetic": True,
+                    }
+                )
+
+            messages = normalized_output.get("messages", [])
+            files = normalized_output.get("files", {})
+
+            tool_messages: list[ToolMessage] = []
+            if messages:
+                last: BaseMessage | Any = messages[-1]
+                content = getattr(last, "content", last)
+                if isinstance(content, list):
+                    text_parts = [
+                        block.get("text", "")
+                        for block in content
+                        if isinstance(block, dict) and block.get("type") == "text"
+                    ]
+                    content = "\n".join([part for part in text_parts if part]) or str(content)
+                elif not isinstance(content, str):
+                    content = str(content)
+
+                tool_messages.append(ToolMessage(content=content, tool_call_id=tool_call_id))
+
+            return Command(update={"files": files, "messages": tool_messages})
+
+        return task
+
+    task_tool = _create_async_task_tool(
+        tools=base_tools,
+        instructions=LEARNING_AGENT_INSTRUCTIONS,
+        subagent_defs=subagents,
+        model=llm,
+        state_schema=LearningAgentState,
+    )
+
+    agent_tools: list[BaseTool] = [
+        *base_tools,
+        task_tool,
+    ]
+
+    # Create the agent
+    agent = create_react_agent(
+        model=llm,
+        prompt=LEARNING_AGENT_INSTRUCTIONS + base_prompt,
+        tools=agent_tools,
         state_schema=LearningAgentState,
     )
 

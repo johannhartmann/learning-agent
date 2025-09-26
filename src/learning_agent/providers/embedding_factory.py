@@ -1,6 +1,5 @@
 """Factory for creating provider-agnostic embedding models."""
 
-import contextlib
 from typing import Any, cast
 
 from langchain_core.embeddings import Embeddings
@@ -64,7 +63,7 @@ def get_embeddings(config: Any) -> Embeddings:
 
         api_key = getattr(config, "cohere_api_key", None)
         model_name = embedding_model or "embed-english-v3.0"
-        return cast(Embeddings, CohereEmbeddings(model=model_name, cohere_api_key=api_key))
+        return cast("Embeddings", CohereEmbeddings(model=model_name, cohere_api_key=api_key))
 
     if embedding_provider == "huggingface":
         try:
@@ -87,14 +86,12 @@ def get_embeddings(config: Any) -> Embeddings:
                     "Please install langchain-huggingface: pip install langchain-huggingface"
                 ) from e
             return cast(
-                Embeddings,
-                HuggingFaceEndpointEmbeddings(
-                    model=model_name, huggingfacehub_api_token=api_key
-                ),
+                "Embeddings",
+                HuggingFaceEndpointEmbeddings(model=model_name, huggingfacehub_api_token=api_key),
             )
         # Using local model
         return cast(
-            Embeddings,
+            "Embeddings",
             HuggingFaceEmbeddings(
                 model_name=model_name, cache_folder=str(config.learning_db_path / "models")
             ),
@@ -111,7 +108,7 @@ def get_embeddings(config: Any) -> Embeddings:
         model_name = embedding_model or "llama2"
         base_url = getattr(config, "ollama_base_url", "http://localhost:11434")
 
-        return cast(Embeddings, OllamaEmbeddings(model=model_name, base_url=base_url))
+        return cast("Embeddings", OllamaEmbeddings(model=model_name, base_url=base_url))
 
     if embedding_provider == "google-genai":
         try:
@@ -124,7 +121,7 @@ def get_embeddings(config: Any) -> Embeddings:
         api_key = getattr(config, "google_api_key", None)
         model_name = embedding_model or "models/embedding-001"
         return cast(
-            Embeddings, GoogleGenerativeAIEmbeddings(model=model_name, google_api_key=api_key)
+            "Embeddings", GoogleGenerativeAIEmbeddings(model=model_name, google_api_key=api_key)
         )
 
     if embedding_provider == "mistralai":
@@ -137,7 +134,7 @@ def get_embeddings(config: Any) -> Embeddings:
 
         api_key = getattr(config, "mistral_api_key", None)
         model_name = embedding_model or "mistral-embed"
-        return cast(Embeddings, MistralAIEmbeddings(model=model_name, api_key=api_key))
+        return cast("Embeddings", MistralAIEmbeddings(model=model_name, api_key=api_key))
 
     if embedding_provider == "voyage":
         try:
@@ -149,7 +146,7 @@ def get_embeddings(config: Any) -> Embeddings:
 
         api_key = getattr(config, "voyage_api_key", None)
         model_name = embedding_model or "voyage-2"
-        return cast(Embeddings, VoyageEmbeddings(model=model_name, api_key=api_key))
+        return cast("Embeddings", VoyageEmbeddings(model=model_name, api_key=api_key))
 
     # Default to OpenAI if no provider specified
     if not embedding_provider:
