@@ -89,9 +89,30 @@ async def _ensure_playwright() -> Page:
     return _pw_page
 
 
-def _get_llm() -> None:
-    # No LLM used in Playwright-only implementation. Kept for compatibility.
-    return None
+def _get_llm() -> Any:
+    """Get LLM for content extraction."""
+    model = os.getenv("BROWSER_EXTRACTION_MODEL")
+
+    if not model:
+        if os.getenv("ANTHROPIC_API_KEY"):
+            model = "claude-3-5-haiku-20241022"
+        elif os.getenv("OPENAI_API_KEY"):
+            model = "gpt-4o-mini"
+        else:
+            raise RuntimeError("No LLM API key found (ANTHROPIC_API_KEY or OPENAI_API_KEY)")
+
+    try:
+        if model.startswith("claude"):
+            from langchain_anthropic import ChatAnthropic
+
+            return ChatAnthropic(model=model, temperature=0)
+        if model.startswith("gpt"):
+            from langchain_openai import ChatOpenAI
+
+            return ChatOpenAI(model=model, temperature=0)  # type: ignore[call-arg]
+        raise ValueError(f"Unsupported model: {model}")
+    except ImportError as e:
+        raise RuntimeError(f"LLM provider not available: {e}") from e
 
 
 def _clean_page_content(
@@ -275,7 +296,7 @@ async def extract_structured_data(
     extract_links: bool = False,
     start_from_char: int = 0,
 ) -> str:
-    """Return filtered page content suitable for downstream structured extraction."""
+    """Extract relevant information from page using LLM (browser-use strategy)."""
     if not HAVE_PW:
         raise RuntimeError("playwright not available")
     if start_from_char < 0:
@@ -302,23 +323,44 @@ async def extract_structured_data(
     truncate_at = _smart_truncate(segment_source, MAX_STRUCTURED_CHARS)
     segment = segment_source[:truncate_at]
     truncated = start_from_char + truncate_at < total_chars
-    next_start = start_from_char + truncate_at if truncated else None
+
+    llm = _get_llm()
+    extraction_prompt = f"""Extract relevant information from this webpage based on the user's query.
+
+Query: {query}
+
+Page URL: {page.url}
+
+Page content (markdown):
+{segment}
+
+Instructions:
+- Extract ONLY the information relevant to the query
+- Ignore ads, navigation, recommended links, and unrelated content
+- Format the response clearly and concisely
+- If the query asks for headlines/links, include them in markdown format [title](url)
+- If the query asks for specific data (contact info, prices, etc.), extract just that data
+
+Return ONLY the extracted relevant information:"""
+
+    try:
+        response = await llm.ainvoke(extraction_prompt)
+        extracted_content = response.content if hasattr(response, "content") else str(response)
+    except Exception:
+        logger.exception("LLM extraction failed")
+        extracted_content = segment
 
     payload: dict[str, Any] = {
         "action": "extract_structured_data",
         "status": "ok",
         "query": query,
         "url": page.url,
-        "content": segment,
+        "content": extracted_content,
         "start_from_char": start_from_char,
         "truncated": truncated,
         "total_filtered_chars": total_chars,
         "stats": stats,
     }
-    if next_start is not None:
-        payload["next_start_char"] = next_start
-    if extract_links and links:
-        payload["links"] = links
 
     return json.dumps(payload)
 
