@@ -23,16 +23,19 @@ import json
 import os
 import re
 from typing import Any
+
+
 try:
-    from playwright.async_api import async_playwright, Page
+    from playwright.async_api import Page, async_playwright
+
     HAVE_PW = True
 except Exception:  # pragma: no cover - optional dependency path
     async_playwright = None  # type: ignore[assignment]
-    Page = object  # type: ignore[assignment]
+    Page = object  # type: ignore[misc,assignment]
     HAVE_PW = False
-from bs4 import BeautifulSoup
-from mcp.server.fastmcp import FastMCP
 import logging
+
+from mcp.server.fastmcp import FastMCP
 
 
 mcp = FastMCP("BrowserUse")
@@ -42,7 +45,7 @@ logger = logging.getLogger(__name__)
 _pw = None
 _pw_browser = None
 _pw_context = None
-_pw_page: Page | None = None  # type: ignore[assignment]
+_pw_page: Page | None = None
 
 MAX_STRUCTURED_CHARS = 30_000
 
@@ -86,53 +89,44 @@ async def _ensure_playwright() -> Page:
     return _pw_page
 
 
-def _get_llm():
+def _get_llm() -> None:
     # No LLM used in Playwright-only implementation. Kept for compatibility.
     return None
 
 
-def _clean_page_content(html: str, extract_links: bool = False) -> tuple[str, dict[str, Any], list[dict[str, str]]]:
-    """Convert raw HTML into a whitespace-normalised plaintext snippet."""
-    soup = BeautifulSoup(html, "html.parser")
-    for tag in soup(["script", "style", "noscript", "iframe", "svg", "canvas"]):
-        tag.decompose()
+def _clean_page_content(
+    html: str, extract_links: bool = False
+) -> tuple[str, dict[str, Any], list[dict[str, str]]]:
+    """Convert raw HTML into markdown using html2text (browser-use's approach)."""
+    import html2text
 
-    links: list[dict[str, str]] = []
-    if extract_links:
-        for anchor in soup.find_all("a"):
-            text = anchor.get_text(" ", strip=True)
-            href = anchor.get("href") or ""
-            if text or href:
-                links.append({"text": text, "href": href})
-        # Deduplicate while preserving order and limit volume
-        seen: set[tuple[str, str]] = set()
-        unique_links: list[dict[str, str]] = []
-        for item in links:
-            key = (item["text"], item["href"])
-            if key in seen:
-                continue
-            seen.add(key)
-            unique_links.append(item)
-            if len(unique_links) >= 100:
-                break
-        links = unique_links
+    h = html2text.HTML2Text()
+    h.ignore_images = True
+    h.ignore_links = not extract_links
+    h.body_width = 0
+    h.unicode_snob = True
 
-    text_raw = soup.get_text("\n")
+    markdown_raw = h.handle(html)
+
     collapsed_lines: list[str] = []
-    for line in text_raw.splitlines():
-        normalised = re.sub(r"\s+", " ", line).strip()
-        if normalised:
-            collapsed_lines.append(normalised)
-    cleaned_text = "\n".join(collapsed_lines)
+    for line in markdown_raw.splitlines():
+        stripped = line.strip()
+        if len(stripped) > 1:
+            collapsed_lines.append(line)
+
+    cleaned_markdown = "\n".join(collapsed_lines)
+    cleaned_markdown = re.sub(r"\n{3,}", "\n\n", cleaned_markdown)
 
     stats = {
         "original_html_chars": len(html),
-        "initial_text_chars": len(text_raw),
-        "filtered_text_chars": len(cleaned_text),
-        "filtered_chars_removed": max(len(text_raw) - len(cleaned_text), 0),
+        "initial_text_chars": len(markdown_raw),
+        "filtered_text_chars": len(cleaned_markdown),
+        "filtered_chars_removed": max(len(markdown_raw) - len(cleaned_markdown), 0),
     }
 
-    return cleaned_text, stats, links
+    links: list[dict[str, str]] = []
+
+    return cleaned_markdown, stats, links
 
 
 def _smart_truncate(text: str, limit: int = MAX_STRUCTURED_CHARS) -> int:
@@ -174,7 +168,9 @@ async def wait_for_timeout(timeout: float) -> str:
         raise RuntimeError("playwright not available")
     page = await _ensure_playwright()
     await page.wait_for_timeout(timeout)
-    return json.dumps({"action": "wait_for_timeout", "status": "ok", "timeout": timeout, "url": page.url})
+    return json.dumps(
+        {"action": "wait_for_timeout", "status": "ok", "timeout": timeout, "url": page.url}
+    )
 
 
 @mcp.tool()
@@ -195,7 +191,15 @@ async def mouse_wheel(delta_x: float = 0, delta_y: float = 0) -> str:
         raise RuntimeError("playwright not available")
     page = await _ensure_playwright()
     await page.mouse.wheel(delta_x, delta_y)
-    return json.dumps({"action": "mouse_wheel", "status": "ok", "delta_x": delta_x, "delta_y": delta_y, "url": page.url})
+    return json.dumps(
+        {
+            "action": "mouse_wheel",
+            "status": "ok",
+            "delta_x": delta_x,
+            "delta_y": delta_y,
+            "url": page.url,
+        }
+    )
 
 
 @mcp.tool()

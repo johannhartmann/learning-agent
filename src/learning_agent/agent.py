@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Mapping, Sequence
-from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -201,68 +200,13 @@ def _normalize_subagent_output(subagent_type: str, output: Any) -> dict[str, Any
     return normalized
 
 
-class _HeadlineParser(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self._current_href: str | None = None
-        self._buffer: list[str] = []
-        self.headlines: list[tuple[str, str]] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag != "a":
-            return
-        href = dict(attrs).get("href")
-        if not href:
-            return
-        self._current_href = href
-        self._buffer = []
-
-    def handle_data(self, data: str) -> None:
-        if self._current_href is None:
-            return
-        stripped = data.strip()
-        if stripped:
-            self._buffer.append(stripped)
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag != "a" or self._current_href is None:
-            return
-        text = " ".join(self._buffer).strip()
-        href = self._current_href
-        self._current_href = None
-        self._buffer = []
-        if not text:
-            return
-        if len(text) < 20:
-            return
-        lowered = text.lower()
-        if any(prefix in lowered for prefix in ("mehr", "weiter", "anzeige")):
-            return
-        if href.startswith("/"):
-            href = f"https://www.stern.de{href}"
-        self.headlines.append((text, href))
-
-
 def _summarize_research_extracts(extracts: list[str]) -> str:
-    parser = _HeadlineParser()
-    for snippet in extracts:
-        try:
-            parser.feed(snippet)
-        except Exception:
-            continue
-    seen: set[str] = set()
-    bullets: list[str] = []
-    for title, url in parser.headlines:
-        key = title.strip()
-        if key in seen:
-            continue
-        seen.add(key)
-        bullets.append(f"- [{title}]({url})")
-        if len(bullets) >= 5:
-            break
-    if not bullets:
+    if not extracts:
         return ""
-    return "Top findings:\n" + "\n".join(bullets)
+    combined = "\n\n".join(snippet.strip() for snippet in extracts if snippet.strip())
+    if not combined:
+        return ""
+    return f"Research findings:\n\n{combined}"
 
 
 def create_learning_agent(
@@ -580,8 +524,14 @@ def create_learning_agent(
                 # Add structured research data (headlines, URLs) to agent context
                 if subagent_type == "research-agent":
                     structured_content = stream_adapter.get_structured_content()
+                    print(f"[DEBUG] structured_content length: {len(structured_content)}")
                     if structured_content:
+                        for i, content in enumerate(structured_content[:2]):
+                            print(f"[DEBUG] structured_content[{i}] preview: {content[:500]}")
                         summary = _summarize_research_extracts(structured_content)
+                        print(
+                            f"[DEBUG] summary from _summarize_research_extracts: {summary[:500] if summary else 'EMPTY'}"
+                        )
                         if summary:
                             messages_list.append(AIMessage(content=summary))
 
