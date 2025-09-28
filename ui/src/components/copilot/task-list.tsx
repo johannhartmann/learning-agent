@@ -52,25 +52,28 @@ export function TaskList() {
         Task List
       </h2>
       <ol className="mt-4 space-y-3 text-sm">
-        {todos.map((todo, index) => (
-          <li key={`${todo.content}-${index}`} className="flex items-start gap-3">
-            <span
-              className="mt-1.5 inline-flex h-2 w-2 flex-none rounded-full"
-              style={{ backgroundColor: "var(--color-primary)" }}
-              aria-hidden
-            />
-            <div>
-              <p className="font-medium leading-relaxed" style={{ color: "var(--color-text-primary)" }}>
-                {todo.content}
-              </p>
-              {todo.status && todo.status !== "pending" ? (
-                <p className="mt-1 text-xs" style={{ color: "var(--color-text-tertiary)" }}>
-                  {todo.status.replace("_", " ")}
+        {todos.map((todo, index) => {
+          const key = todo.id || `${todo.content}-${index}`;
+          return (
+            <li key={key} className="flex items-start gap-3">
+              <span
+                className="mt-1.5 inline-flex h-2 w-2 flex-none rounded-full"
+                style={{ backgroundColor: "var(--color-primary)" }}
+                aria-hidden
+              />
+              <div>
+                <p className="font-medium leading-relaxed" style={{ color: "var(--color-text-primary)" }}>
+                  {todo.content}
                 </p>
-              ) : null}
-            </div>
-          </li>
-        ))}
+                {todo.status && todo.status !== "pending" ? (
+                  <p className="mt-1 text-xs" style={{ color: "var(--color-text-tertiary)" }}>
+                    {todo.status.replace("_", " ")}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );

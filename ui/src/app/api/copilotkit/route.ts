@@ -25,6 +25,10 @@ const runtime = new CopilotRuntime({
       deploymentUrl,
       langsmithApiKey: langsmithApiKey ?? undefined,
       agentName: agentKey,
+      // Configure to stream state values for useCoAgent hook
+      assistantConfig: {
+        tags: ["learning-agent"],
+      },
     }),
   },
 });

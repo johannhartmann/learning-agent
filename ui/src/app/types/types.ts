@@ -36,7 +36,7 @@ export interface FileItem {
 }
 
 export interface TodoItem {
-  id: string;
+  id?: string;
   content: string;
   status: "pending" | "in_progress" | "completed";
   createdAt?: Date;
