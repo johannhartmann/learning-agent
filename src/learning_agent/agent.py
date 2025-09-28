@@ -431,7 +431,7 @@ def create_learning_agent(
                 stream_adapter = StreamAdapter(
                     writer,
                     agent_label=subagent_type,
-                    parent_id=tool_call_id,
+                    parentMessageId=tool_call_id,
                     profile="user",
                 )
                 stream_adapter.begin(
@@ -572,10 +572,19 @@ def create_learning_agent(
                         "research_done",
                         normalized_output,
                     )
+                messages_list = normalized_output.setdefault("messages", [])
                 transcript = stream_adapter.get_transcript()
                 if transcript:
-                    messages_list = normalized_output.setdefault("messages", [])
                     messages_list.append(AIMessage(content=transcript))
+
+                # Add structured research data (headlines, URLs) to agent context
+                if subagent_type == "research-agent":
+                    structured_content = stream_adapter.get_structured_content()
+                    if structured_content:
+                        summary = _summarize_research_extracts(structured_content)
+                        if summary:
+                            messages_list.append(AIMessage(content=summary))
+
                 stream_adapter.complete(normalized_output)
             if (
                 writer is not None

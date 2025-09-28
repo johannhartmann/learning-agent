@@ -100,11 +100,70 @@ function ToolCallCard({
   );
 }
 
+function parseToolCallsFromTranscript(transcript: string): Array<{ name: string; status: string }> {
+  const toolCalls: Array<{ name: string; status: string }> = [];
+  const lines = transcript.split('\n');
+
+  for (const line of lines) {
+    const startMatch = line.match(/→ (\w+) start/);
+    if (startMatch) {
+      toolCalls.push({ name: startMatch[1], status: 'executing' });
+    }
+
+    const completeMatch = line.match(/← (\w+) complete/);
+    if (completeMatch) {
+      const existing = toolCalls.find(t => t.name === completeMatch[1] && t.status === 'executing');
+      if (existing) {
+        existing.status = 'complete';
+      }
+    }
+  }
+
+  return toolCalls;
+}
+
+function EnhancedToolCard({
+  name,
+  args,
+  status,
+  result,
+}: {
+  name: string;
+  args: Record<string, unknown>;
+  status: string;
+  result?: unknown;
+}) {
+  // If this is a task with a transcript result, extract and show subtool calls
+  const transcript = typeof result === 'string' ? result : '';
+  const subtoolCalls = transcript.includes('→') ? parseToolCallsFromTranscript(transcript) : [];
+
+  return (
+    <div className="space-y-2">
+      <ToolCallCard name={name} args={args} status={status} result={result} />
+
+      {subtoolCalls.length > 0 && (
+        <div className="ml-6 space-y-2 border-l-2 pl-4" style={{ borderColor: 'var(--color-border)' }}>
+          {subtoolCalls.map((subtool, idx) => (
+            <ToolCallCard
+              key={`${subtool.name}-${idx}`}
+              name={subtool.name}
+              args={{}}
+              status={subtool.status}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AgentStreaming() {
   useCopilotAction({
     name: "*",
     render: ({ name, args, status, result }) => {
-      return <ToolCallCard name={name} args={args || {}} status={status} result={result} />;
+      // CRITICAL: Never return null or empty, always return a component
+      // Otherwise CopilotKit will hide the action after completion
+      return <EnhancedToolCard name={name} args={args || {}} status={status} result={result} />;
     },
   });
 

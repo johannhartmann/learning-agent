@@ -12,16 +12,24 @@ from __future__ import annotations
 
 import asyncio
 import atexit
+import contextlib
 import json
-import os
 import logging
+import os
 from typing import Any
 
-from anyio import ClosedResourceError
+from anyio import ClosedResourceError  # type: ignore[import-not-found]
+
 
 try:  # Optional during import-time when not running agents
-    from langchain_core.tools import tool as lc_tool, StructuredTool  # type: ignore[import-not-found]
-    from langchain_mcp_adapters.client import create_session, MultiServerMCPClient  # type: ignore[import-not-found]
+    from langchain_core.tools import (  # type: ignore[import-not-found]
+        StructuredTool,
+        tool as lc_tool,
+    )
+    from langchain_mcp_adapters.client import (  # type: ignore[import-not-found]
+        MultiServerMCPClient,
+        create_session,
+    )
     from langchain_mcp_adapters.tools import (  # type: ignore[import-not-found]
         _convert_call_tool_result,
         load_mcp_tools,
@@ -114,7 +122,9 @@ async def _reset_session() -> None:
         await _create_session_locked()
 
 
-async def _call_tool_with_session(name: str, arguments: dict[str, Any]) -> tuple[str | list[str], list[Any] | None]:
+async def _call_tool_with_session(
+    name: str, arguments: dict[str, Any]
+) -> tuple[str | list[str], list[Any] | None]:
     if _convert_call_tool_result is None:
         raise RuntimeError("langchain-mcp-adapters conversion unavailable")
     session = await _ensure_session()
@@ -125,7 +135,6 @@ async def _call_tool_with_session(name: str, arguments: dict[str, Any]) -> tuple
         session = await _ensure_session()
         result = await session.call_tool(name, arguments)
     return _convert_call_tool_result(result)
-
 
 
 async def _shutdown_session_async() -> None:
@@ -139,10 +148,8 @@ async def _shutdown_session_async() -> None:
 async def shutdown_mcp_browser() -> None:
     """Close the shared MCP session if it is active."""
     loop = None
-    try:
+    with contextlib.suppress(RuntimeError):
         loop = asyncio.get_running_loop()
-    except RuntimeError:
-        pass
 
     if _MCP_SESSION_LOOP is not None and loop is not None and _MCP_SESSION_LOOP is not loop:
         future = asyncio.run_coroutine_threadsafe(_shutdown_session_async(), _MCP_SESSION_LOOP)
@@ -200,9 +207,7 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
         "XAUTHORITY",
         "XDG_RUNTIME_DIR",
     )
-    server_env: dict[str, str] = {
-        key: value for key in inherit_keys if (value := os.getenv(key))
-    }
+    server_env: dict[str, str] = {key: value for key in inherit_keys if (value := os.getenv(key))}
 
     server_env["BROWSER_HEADLESS"] = "true" if _truthy("BROWSER_HEADLESS", True) else "false"
     server_env["BROWSER_KEEP_ALIVE"] = "true" if _truthy("BROWSER_KEEP_ALIVE", False) else "false"
@@ -294,7 +299,9 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
         description = getattr(tool_obj, "description", "")
         metadata = getattr(tool_obj, "metadata", None)
 
-        async def _wrapped_tool(*, __original_name: str = base_name, **kwargs: Any) -> tuple[str | list[str], list[Any] | None]:
+        async def _wrapped_tool(
+            *, __original_name: str = base_name, **kwargs: Any
+        ) -> tuple[str | list[str], list[Any] | None]:
             return await _call_tool_with_session(__original_name, kwargs)
 
         structured = StructuredTool(

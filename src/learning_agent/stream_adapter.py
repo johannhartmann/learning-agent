@@ -137,13 +137,13 @@ class StreamAdapter:
         *,
         agent_label: str,
         trace_id: str | None = None,
-        parent_id: str | None = None,
+        parentMessageId: str | None = None,  # noqa: N803
         profile: str = "user",
     ) -> None:
         self._emit = emit
         self._agent_label = agent_label
         self._trace_id = trace_id or str(uuid.uuid4())
-        self._parent_id = parent_id
+        self._parent_message_id = parentMessageId
         self._root_call_id = str(uuid.uuid4())
         self._profile = profile
         self._sampler = EventSampler(self._emit, profile=profile)
@@ -169,19 +169,19 @@ class StreamAdapter:
         type_: str,
         call_id: str,
         payload: dict[str, Any],
-        parent_id: str | None = None,
+        parentMessageId: str | None = None,  # noqa: N803
         origin: str = "live",
         event_name: str | None = None,
     ) -> StreamEvent:
         resolved_parent = (
-            parent_id if parent_id is not None else (self._parent_id or self._root_call_id)
+            parentMessageId if parentMessageId is not None else self._parent_message_id
         )
         event = {
             "type": type_,
             "ts": time.time(),
             "trace_id": self._trace_id,
             "run_id": self._run_id,
-            "parent_id": resolved_parent,
+            "parentMessageId": resolved_parent,
             "call_id": call_id,
             "seq": next(self._seq[call_id]),
             "origin": origin,
@@ -215,7 +215,7 @@ class StreamAdapter:
             type_="tool_start",
             call_id=self._root_call_id,
             payload=payload,
-            parent_id=self._parent_id,
+            parentMessageId=self._parent_message_id,
             event_name="start",
         )
         self._sampler.push(start_event)
@@ -290,9 +290,11 @@ class StreamAdapter:
         if kind == "on_tool_end":
             key = data.get("id") or event.get("run_id") or f"{name}:{uuid.uuid4()}"
             call_id = self._child_calls.pop(key, str(uuid.uuid4()))
+            tool_name = name or data.get("name")
+            result = coerce_to_dict(data.get("output"))
             payload = {
-                "tool_name": name or data.get("name"),
-                "result": coerce_to_dict(data.get("output")),
+                "tool_name": tool_name,
+                "result": result,
             }
             envelope = self._envelope(
                 type_="tool_end",
@@ -300,17 +302,24 @@ class StreamAdapter:
                 payload=payload,
             )
             self._sampler.push(envelope)
-            tool_display = payload.get("tool_name") or "tool"
-            result = payload.get("result")
-            snippet = ""
-            if isinstance(result, dict):
-                if tool_display == "research_extract_structured_data":
-                    content = result.get("content")
-                    if isinstance(content, str):
-                        self._structured_content.append(content)
-                snippet = result.get("text") or result.get("content") or ""
-            elif isinstance(result, str):
-                snippet = result
+
+            result_envelope = self._envelope(
+                type_="tool_result",
+                call_id=call_id,
+                payload={
+                    "tool_name": tool_name,
+                    "result": result,
+                },
+                event_name="tool_result",
+            )
+            self._sampler.push(result_envelope)
+
+            tool_display = tool_name or "tool"
+            if tool_display == "research_extract_structured_data":
+                content = result.get("content")
+                if isinstance(content, str):
+                    self._structured_content.append(content)
+            snippet = result.get("text") or result.get("content") or ""
             if snippet:
                 snippet = snippet[:160]
             self._event_log.append(
@@ -328,7 +337,7 @@ class StreamAdapter:
             envelope = self._envelope(
                 type_="error",
                 call_id=self._root_call_id,
-                parent_id=self._parent_id,
+                parentMessageId=self._parent_message_id,
                 payload=payload,
                 event_name="error",
             )
@@ -341,7 +350,7 @@ class StreamAdapter:
         envelope = self._envelope(
             type_="warning",
             call_id=self._root_call_id,
-            parent_id=self._parent_id,
+            parentMessageId=self._parent_message_id,
             payload={"message": message},
             event_name="warning",
         )
@@ -360,7 +369,7 @@ class StreamAdapter:
         end_event = self._envelope(
             type_="tool_end",
             call_id=self._root_call_id,
-            parent_id=self._parent_id,
+            parentMessageId=self._parent_message_id,
             payload=payload,
             event_name="tool_end" if status != "success" else "finish",
         )
