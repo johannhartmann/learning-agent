@@ -7,6 +7,7 @@ import os
 from copy import deepcopy
 from typing import Any
 
+import httpx
 from langchain_core.messages import BaseMessage, HumanMessage
 from pydantic import BaseModel, Field
 
@@ -29,7 +30,7 @@ def compute_learning_relevance_signals(
 
     # Evidence that the agent touched tools / environment
     total_tool_calls = execution_analysis.get("total_tool_calls")
-    if isinstance(total_tool_calls, (int, float)) and total_tool_calls > 0:
+    if isinstance(total_tool_calls, int | float) and total_tool_calls > 0:
         signals.append("tool_usage")
 
     if execution_analysis.get("inefficiencies") or execution_analysis.get("redundancies"):
@@ -46,8 +47,7 @@ def compute_learning_relevance_signals(
     todos = metadata.get("todos")
     if isinstance(todos, list) and any(
         isinstance(todo, dict)
-        and str(todo.get("status", "")).lower()
-        not in {"", "pending", "todo", "not_started"}
+        and str(todo.get("status", "")).lower() not in {"", "pending", "todo", "not_started"}
         for todo in todos
     ):
         signals.append("todo_progress")
@@ -116,9 +116,7 @@ class LangMemLearningSystem:
         self.storage = VectorLearningStorage(database_url)
 
         # Background reflection handling
-        self._background_delay = float(
-            os.getenv("LEARNING_BACKGROUND_DELAY", "30")
-        )
+        self._background_delay = float(os.getenv("LEARNING_BACKGROUND_DELAY", "30"))
         self._background_lock = asyncio.Lock()
         self._background_task: asyncio.Task[None] | None = None
         self._pending_payload: dict[str, Any] | None = None
@@ -244,6 +242,12 @@ Extract learnings from this task execution with specific, actionable insights.""
                 }
 
                 memory_id = await self.storage.store_memory(memory)
+                memory["id"] = memory_id  # Update with actual stored ID
+
+                # Update thread state with new memory for UI display
+                thread_id = metadata.get("thread_id")
+                if thread_id:
+                    await self._update_thread_state(thread_id, memory)
 
                 # Log for debugging
                 self._logger.info(
@@ -253,6 +257,83 @@ Extract learnings from this task execution with specific, actionable insights.""
 
         except Exception:
             self._logger.exception("Error processing and storing deep learning memory")
+
+    async def _update_thread_state(self, thread_id: str, memory: dict[str, Any]) -> None:
+        """Update the thread state with new memory for UI display.
+
+        This allows the UI to show learning results from the current session
+        without blocking the graph execution.
+        """
+        try:
+            # Get LangGraph server URL
+            langgraph_url = os.environ.get(
+                "LANGGRAPH_SERVER_URL",
+                "http://localhost:2024"
+                if os.environ.get("ENV") == "local"
+                else "http://server:2024",
+            )
+
+            # Prepare simplified memory for UI display
+            timestamp_val = memory.get("timestamp")
+            ui_memory = {
+                "id": memory.get("id"),
+                "task": memory.get("task"),
+                "tactical_learning": memory.get("tactical_learning"),
+                "strategic_learning": memory.get("strategic_learning"),
+                "meta_learning": memory.get("meta_learning"),
+                "confidence_score": memory.get("confidence_score"),
+                "timestamp": timestamp_val.isoformat() if timestamp_val else None,
+            }
+
+            # Make HTTP PATCH request to update thread state
+            # First, get the current state to append to existing memories
+            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:  # nosec B113
+                # Get current state
+                get_response = await client.get(
+                    f"{langgraph_url}/threads/{thread_id}/state",
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Api-Key": "test-key",
+                    },
+                    timeout=5.0,
+                )
+
+                existing_memories = []
+                if get_response.status_code == 200:
+                    current_state = get_response.json()
+                    existing_memories = current_state.get("values", {}).get("memories", [])
+
+                # Append new memory to existing ones
+                updated_memories = [*existing_memories, ui_memory]
+
+                # Update state with appended memories
+                response = await client.patch(
+                    f"{langgraph_url}/threads/{thread_id}/state",
+                    json={
+                        "values": {
+                            "memories": updated_memories,
+                        },
+                        "as_node": "learning_update",  # Identify the update source
+                    },
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Api-Key": "test-key",  # Use appropriate API key
+                    },
+                    timeout=5.0,
+                )
+
+                if response.status_code == 200:
+                    self._logger.info(
+                        f"Successfully updated thread state with memory for thread {thread_id}"
+                    )
+                else:
+                    self._logger.warning(
+                        f"Failed to update thread state: {response.status_code} - {response.text}"
+                    )
+
+        except Exception:
+            # Don't let state update failures break the learning process
+            self._logger.exception(f"Error updating thread state for {thread_id}")
 
     async def _schedule_processing(
         self,
@@ -294,9 +375,7 @@ Extract learnings from this task execution with specific, actionable insights.""
             if not payload:
                 return
 
-            await self._process_and_store_memory(
-                payload["messages"], payload["metadata"]
-            )
+            await self._process_and_store_memory(payload["messages"], payload["metadata"])
         except asyncio.CancelledError:
             raise
         except Exception:
