@@ -3,6 +3,7 @@
 from typing import Annotated, Any
 
 from langchain_core.messages import ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolCallId, tool
 from langchain_sandbox.pyodide import PyodideSandbox
 from langgraph.prebuilt import InjectedState
@@ -154,6 +155,7 @@ async def python_sandbox(
     code: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
     state: Annotated[LearningAgentState, InjectedState],
+    config: RunnableConfig,
     reset_state: bool = False,
 ) -> Command[Any]:
     """Execute Python code in a secure sandbox environment.
@@ -287,13 +289,21 @@ async def python_sandbox(
 
         if result.get("files"):
             response_parts.append(f"\n**Generated {len(result['files'])} file(s):**\n")
+
+            # Get thread_id from LangGraph config
+            thread_id = config.get("configurable", {}).get("thread_id")
             for file_path in result["files"]:
-                response_parts.append(f"- {file_path}\n")
-                # Add image display for image files
                 if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".svg")):
-                    response_parts.append(
-                        f"![{file_path.split('/')[-1]}](sandbox-file:{file_path})\n"
-                    )
+                    # Use absolute URL with thread_id in path so markdown parser accepts it
+                    if thread_id:
+                        file_url = (
+                            f"http://localhost:10300/api/internal/files/{thread_id}{file_path}"
+                        )
+                    else:
+                        file_url = f"http://localhost:10300/api/internal/files{file_path}"
+                    response_parts.append(f"![{file_path.split('/')[-1]}]({file_url})\n")
+                else:
+                    response_parts.append(f"- {file_path}\n")
 
         if result.get("tables"):
             response_parts.append(f"\n**Generated {len(result['tables'])} table(s)**")

@@ -93,6 +93,53 @@ services:
         - action: rebuild
           path: Dockerfile.server
 
+  # API server for file serving and memory access
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+      args:
+        DEEPAGENTS_REF: ${DEEPAGENTS_REF:-master}
+    container_name: learning-agent-api-server
+    ports:
+      - "8001:8001"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - LANGSMITH_TRACING=true
+      - LANGSMITH_PROJECT=learning-agent
+      - PYTHONPATH=/app/src
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - DATABASE_URL=postgresql://learning_agent:learning_agent_pass@postgres:5432/learning_memories
+      - DATABASE_URI=postgresql://learning_agent:learning_agent_pass@postgres:5432/learning_memories
+      - DOCKER_ENV=1
+      - LANGGRAPH_SERVER_URL=http://server:2024
+    command: python -m learning_agent.api_server
+    volumes:
+      - ./.agent:/app/.agent
+    networks:
+      - learning-agent-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      server:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./src
+          target: /app/src
+          ignore:
+            - "**/__pycache__"
+            - "**/*.pyc"
+            - "**/.pytest_cache"
+            - "**/.mypy_cache"
+            - "**/.ruff_cache"
+            - "**/.venv"
+            - "**/.DS_Store"
+
   # Deep Agents UI
   ui:
     build:
@@ -107,7 +154,7 @@ services:
       - NEXT_PUBLIC_DEPLOYMENT_URL=http://server:2024
       - DEPLOYMENT_URL=http://server:2024
       - NEXT_PUBLIC_LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
-      - INTERNAL_API_BASE=http://server:8001
+      - INTERNAL_API_BASE=http://api-server:8001
     depends_on:
       - server
     networks:

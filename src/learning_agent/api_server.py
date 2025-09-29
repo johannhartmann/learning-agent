@@ -189,8 +189,9 @@ async def get_file(file_path: str, thread_id: str | None = None) -> Response:
         try:
             # Connect to LangGraph server API to get thread state
             async with httpx.AsyncClient(timeout=30.0) as client:
+                langgraph_url = os.environ.get("LANGGRAPH_SERVER_URL", "http://localhost:2024")
                 response = await client.get(
-                    f"http://localhost:2024/threads/{thread_id}/state",
+                    f"{langgraph_url}/threads/{thread_id}/state",
                     headers={
                         "Content-Type": "application/json",
                         "X-Api-Key": "test-key",
