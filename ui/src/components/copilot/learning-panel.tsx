@@ -37,55 +37,14 @@ function MemoryCard({ memory }: { memory: Memory }) {
         </span>
       </header>
 
-      {/* Display full learning content */}
-      {memory.tactical_learning && (
+      {/* Display learning content */}
+      {memory.learnings && (
         <div>
           <h4 className="font-medium text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>
-            Tactical Learning
+            Key Learnings
           </h4>
-          <p className="text-sm" style={{ color: "var(--color-text-primary)" }}>
-            {memory.tactical_learning}
-          </p>
-        </div>
-      )}
-
-      {memory.strategic_learning && (
-        <div>
-          <h4 className="font-medium text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>
-            Strategic Learning
-          </h4>
-          <p className="text-sm" style={{ color: "var(--color-text-primary)" }}>
-            {memory.strategic_learning}
-          </p>
-        </div>
-      )}
-
-      {memory.meta_learning && (
-        <div>
-          <h4 className="font-medium text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>
-            Meta Learning
-          </h4>
-          <p className="text-sm" style={{ color: "var(--color-text-primary)" }}>
-            {memory.meta_learning}
-          </p>
-        </div>
-      )}
-
-      {memory.anti_patterns && memory.anti_patterns.description && (
-        <div>
-          <h4 className="font-medium text-sm mb-1" style={{ color: "var(--color-warning)" }}>
-            Anti-patterns Detected
-          </h4>
-          <p className="text-sm" style={{ color: "var(--color-text-primary)" }}>
-            {memory.anti_patterns.description}
-          </p>
-        </div>
-      )}
-
-      {memory.reflection && (
-        <div className="pt-2 border-t" style={{ borderColor: "var(--color-border)" }}>
-          <p className="text-xs italic" style={{ color: "var(--color-text-tertiary)" }}>
-            {memory.reflection}
+          <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--color-text-primary)" }}>
+            {memory.learnings}
           </p>
         </div>
       )}

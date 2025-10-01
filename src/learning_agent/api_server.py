@@ -1,4 +1,4 @@
-"""API server for learning agent with memory fetching endpoint."""
+"""API server for learning agent auxiliary tooling."""
 
 import logging
 from typing import Any
@@ -27,8 +27,8 @@ app.add_middleware(
 )
 
 
-class MemoryItem(BaseModel):
-    """Model for individual memory with deep learning dimensions."""
+class LearningItem(BaseModel):
+    """Learning memory returned via REST."""
 
     id: str
     task: str
@@ -47,94 +47,47 @@ class MemoryItem(BaseModel):
     similarity: float | None = None
 
 
-class PatternItem(BaseModel):
-    """Model for pattern with enhanced metadata."""
+class LearningsResponse(BaseModel):
+    """API response containing persisted learnings."""
 
-    id: str
-    pattern: str
-    pattern_type: str | None = None
-    description: str | None = None
-    confidence: float = 0.0
-    success_rate: float = 0.0
-    usage_count: int = 0
-    success_count: int = 0
-    failure_count: int = 0
-    last_applied: str | None = None
-    metadata: dict[str, Any] | None = None
+    learnings: list[LearningItem]
 
 
-class MemoriesResponse(BaseModel):
-    """Response model for memories endpoint with full deep learning data."""
+@app.get("/api/learnings", response_model=LearningsResponse)
+async def get_learnings() -> LearningsResponse:
+    """Fetch persisted learnings for UI polling."""
 
-    memories: list[MemoryItem]
-    patterns: list[PatternItem]
-    learning_queue: list[dict[str, Any]]
-
-
-@app.get("/api/memories", response_model=MemoriesResponse)
-async def get_memories() -> MemoriesResponse:
-    """Fetch processed memories with deep learning dimensions.
-
-    Returns:
-        MemoriesResponse containing memories with all learning fields, patterns, and learning queue
-    """
     try:
         learning_system = get_learning_system()
-        memories, patterns, learning_queue = await learning_system.get_processed_memories_for_ui()
+        memories = await learning_system.get_processed_memories_for_ui()
 
-        logger.info(
-            f"Fetched {len(memories)} memories, "
-            f"{len(patterns)} patterns, "
-            f"{len(learning_queue)} queued items"
+        logger.info("Fetched %d learnings", len(memories))
+
+        return LearningsResponse(
+            learnings=[
+                LearningItem(
+                    id=memory.get("id", ""),
+                    task=memory.get("task", ""),
+                    context=memory.get("context"),
+                    narrative=memory.get("narrative"),
+                    reflection=memory.get("reflection"),
+                    tactical_learning=memory.get("tactical_learning"),
+                    strategic_learning=memory.get("strategic_learning"),
+                    meta_learning=memory.get("meta_learning"),
+                    anti_patterns=memory.get("anti_patterns"),
+                    execution_metadata=memory.get("execution_metadata"),
+                    confidence_score=memory.get("confidence_score", 0.5),
+                    outcome=memory.get("outcome"),
+                    timestamp=memory.get("timestamp"),
+                    metadata=memory.get("metadata"),
+                    similarity=memory.get("similarity"),
+                )
+                for memory in memories
+            ]
         )
-
-        # Convert dictionaries to Pydantic models
-        memory_items = [
-            MemoryItem(
-                id=memory.get("id", ""),
-                task=memory.get("task", ""),
-                context=memory.get("context"),
-                narrative=memory.get("narrative"),
-                reflection=memory.get("reflection"),
-                tactical_learning=memory.get("tactical_learning"),
-                strategic_learning=memory.get("strategic_learning"),
-                meta_learning=memory.get("meta_learning"),
-                anti_patterns=memory.get("anti_patterns"),
-                execution_metadata=memory.get("execution_metadata"),
-                confidence_score=memory.get("confidence_score", 0.5),
-                outcome=memory.get("outcome"),
-                timestamp=memory.get("timestamp"),
-                metadata=memory.get("metadata"),
-                similarity=memory.get("similarity"),
-            )
-            for memory in memories
-        ]
-
-        pattern_items = [
-            PatternItem(
-                id=pattern.get("id", ""),
-                pattern=pattern.get("pattern", ""),
-                pattern_type=pattern.get("pattern_type"),
-                description=pattern.get("description"),
-                confidence=pattern.get("confidence", 0.0),
-                success_rate=pattern.get("success_rate", 0.0),
-                usage_count=pattern.get("usage_count", 0),
-                success_count=pattern.get("success_count", 0),
-                failure_count=pattern.get("failure_count", 0),
-                last_applied=pattern.get("last_applied"),
-                metadata=pattern.get("metadata"),
-            )
-            for pattern in patterns
-        ]
-
-        return MemoriesResponse(
-            memories=memory_items,
-            patterns=pattern_items,
-            learning_queue=learning_queue,
-        )
-    except Exception as e:
-        logger.exception("Error fetching memories")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as exc:  # pragma: no cover - runtime safety
+        logger.exception("Error fetching learnings")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/api/health")

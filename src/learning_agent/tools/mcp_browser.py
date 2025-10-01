@@ -293,6 +293,16 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
 
     tools_prepared: list[Any] = []
 
+    # Tools that require a page to be loaded before use
+    tools_requiring_page = {
+        "extract_structured_data",
+        "mouse_wheel",
+        "screenshot",
+        "keyboard_type",
+        "wait_for_timeout",
+        "url",  # Getting current URL requires a page
+    }
+
     for tool_obj in tools_raw:
         base_name = getattr(tool_obj, "name", "")
         args_schema = getattr(tool_obj, "args_schema", None)
@@ -300,8 +310,32 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
         metadata = getattr(tool_obj, "metadata", None)
 
         async def _wrapped_tool(
-            *, __original_name: str = base_name, **kwargs: Any
+            *,
+            __original_name: str = base_name,
+            __requires_page: bool = base_name in tools_requiring_page,
+            **kwargs: Any,
         ) -> tuple[str | list[str], list[Any] | None]:
+            # Check if page is loaded for tools that require it
+            if __requires_page:
+                try:
+                    url_result = await _call_tool_with_session("url", {})
+                    current_url_raw = url_result[0] if isinstance(url_result, tuple) else url_result
+                    # Convert to string if it's a list
+                    if isinstance(current_url_raw, list):
+                        current_url = current_url_raw[0] if current_url_raw else ""
+                    else:
+                        current_url = str(current_url_raw)
+
+                    # If URL is about:blank or empty, no real page is loaded
+                    if not current_url or current_url.strip() in ("about:blank", ""):
+                        return (
+                            "No page loaded. Use research_goto to navigate to a URL first.",
+                            None,
+                        )
+                except Exception:
+                    # If we can't even get the URL, assume no page is loaded
+                    return ("No page loaded. Use research_goto to navigate to a URL first.", None)
+
             return await _call_tool_with_session(__original_name, kwargs)
 
         structured = StructuredTool(

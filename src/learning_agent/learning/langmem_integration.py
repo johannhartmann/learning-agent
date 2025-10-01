@@ -1,19 +1,39 @@
 """LangMem integration for memory processing with PostgreSQL vector storage."""
 
 import asyncio
-import contextvars
 import logging
 import os
+from collections.abc import Iterable
 from copy import deepcopy
 from typing import Any
 
 import httpx
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import (
+    BaseMessage,
+    HumanMessage,
+    convert_to_messages,
+    convert_to_openai_messages,
+)
+from langchain_core.runnables import RunnableLambda
+from langgraph.store.base import BaseStore, Op, Result
+from langmem import ReflectionExecutor
 from pydantic import BaseModel, Field
 
 from learning_agent.config import settings
 from learning_agent.learning.vector_storage import VectorLearningStorage
 from learning_agent.providers import get_chat_model
+
+
+class _NoopStore(BaseStore):
+    """Minimal BaseStore implementation to satisfy ReflectionExecutor requirements."""
+
+    def batch(self, ops: Iterable[Op]) -> list[Result]:
+        ops_list = list(ops)
+        return [None for _ in ops_list]
+
+    async def abatch(self, ops: Iterable[Op]) -> list[Result]:
+        ops_list = list(ops)
+        return [None for _ in ops_list]
 
 
 def compute_learning_relevance_signals(
@@ -84,20 +104,19 @@ class AntiPatterns(BaseModel):
 class LearningExtraction(BaseModel):
     """Structured learning extraction from task execution."""
 
-    tactical_learning: str = Field(
-        description="Specific implementation insights: What specific implementation approach worked or didn't work? Which tools were most effective? What code patterns or techniques were discovered?"
-    )
-    strategic_learning: str = Field(
-        description="Higher-level patterns: What general approach or strategy emerged? How should similar problems be approached in the future? What architectural or design patterns apply?"
-    )
-    meta_learning: str = Field(
-        description="Learning about learning: How effective was the search for past experiences? What about the learning process itself could be improved? Were past learnings applied effectively?"
-    )
-    anti_patterns: AntiPatterns = Field(
-        description="What NOT to do: inefficiencies, redundancies, and approaches to avoid"
+    learnings: str = Field(
+        description="The key actionable learnings from this task that would help when encountering a similar task in the future. Be specific and practical."
     )
     confidence_score: float = Field(
         default=0.5, ge=0.0, le=1.0, description="Confidence in these learnings (0.0-1.0)"
+    )
+    should_save: bool = Field(
+        default=True,
+        description="True when these learnings should be stored for reuse on future similar tasks",
+    )
+    save_reason: str | None = Field(
+        default=None,
+        description="Short justification for the save decision to aid debugging",
     )
 
 
@@ -116,11 +135,37 @@ class LangMemLearningSystem:
         self.storage = VectorLearningStorage(database_url)
 
         # Background reflection handling
-        self._background_delay = float(os.getenv("LEARNING_BACKGROUND_DELAY", "30"))
-        self._background_lock = asyncio.Lock()
-        self._background_task: asyncio.Task[None] | None = None
-        self._pending_payload: dict[str, Any] | None = None
+        self._default_delay = float(os.getenv("LEARNING_BACKGROUND_DELAY", "30"))
+        self._executor = ReflectionExecutor(
+            self._build_reflection_runnable(),
+            store=_NoopStore(),
+        )
         self._logger = logging.getLogger(__name__)
+
+    def _build_reflection_runnable(self) -> RunnableLambda[dict[str, Any], None]:
+        """Create a runnable compatible with ReflectionExecutor."""
+
+        async def _async_reflector(payload: dict[str, Any]) -> None:
+            openai_messages = payload.get("messages", [])
+            metadata = payload.get("metadata", {})
+            messages = convert_to_messages(openai_messages)
+            await self._process_and_store_memory(messages, metadata)
+
+        def _sync_reflector(payload: dict[str, Any]) -> None:
+            try:
+                asyncio.get_running_loop()
+                # We're already in an event loop, create a background task
+                task = asyncio.create_task(_async_reflector(payload))
+                # Store reference to prevent garbage collection
+                task.add_done_callback(lambda _: None)
+            except RuntimeError:
+                # No event loop running, create one
+                asyncio.run(_async_reflector(payload))
+
+        reflector = RunnableLambda(_sync_reflector, afunc=_async_reflector)
+        # ReflectionExecutor expects a namespace attribute for bookkeeping
+        reflector.namespace = lambda _config=None: ("learning_memories",)  # type: ignore[attr-defined]
+        return reflector
 
     async def _process_and_store_memory(
         self, messages: list[BaseMessage], metadata: dict[str, Any]
@@ -156,8 +201,18 @@ class LangMemLearningSystem:
                 )
                 return
 
-            # Use structured LLM for deep multi-dimensional reflection
-            extraction_prompt = f"""Perform a DEEP REFLECTION on this task execution to extract insightful learnings.
+            # Use structured LLM for learning extraction
+            extraction_prompt = f"""Analyze this task execution and extract any actionable learnings for similar future tasks.
+
+Focus on what would be most helpful to know when encountering a similar task next time. This could include:
+- What approach worked well or didn't work
+- Key insights about tools, patterns, or techniques
+- Important pitfalls to avoid
+- Efficient workflows or shortcuts discovered
+
+If there are meaningful, actionable learnings that would help with similar tasks, set `should_save` to true.
+If the conversation only contains trivial outcomes or well-known practices, set `should_save` to false.
+Always provide a short `save_reason` explaining your decision.
 
 CONVERSATION:
 {full_narrative}
@@ -172,7 +227,7 @@ EXECUTION ANALYSIS:
 Redundancy details: {execution_analysis.get("redundancies", [])}
 Inefficiency details: {execution_analysis.get("inefficiencies", [])}
 
-Extract learnings from this task execution with specific, actionable insights."""
+Extract learnings only when they provide tangible value for future similar tasks."""
 
             # Get structured learning extraction
             learning_result = await self.structured_llm.ainvoke(
@@ -180,53 +235,33 @@ Extract learnings from this task execution with specific, actionable insights.""
             )
 
             if learning_result and isinstance(learning_result, LearningExtraction):
+                if not learning_result.should_save:
+                    self._logger.info(
+                        "Skipping learning storage: model flagged should_save=False (%s)",
+                        learning_result.save_reason or "no reason provided",
+                    )
+                    return
+
                 from datetime import datetime
                 from uuid import uuid4
 
                 metadata.setdefault("learning_signals", relevance_signals)
-
-                # Merge execution analysis items (dicts) with LLM-extracted (strings)
-                def _stringify_items(items: list[Any]) -> list[str]:
-                    out: list[str] = []
-                    for it in items:
-                        if isinstance(it, dict):
-                            # Prefer suggestion or type for a stable string
-                            s = (
-                                str(it.get("suggestion"))
-                                if "suggestion" in it
-                                else f"{it.get('type', 'item')}: {it}"
-                            )
-                            out.append(s)
-                        else:
-                            out.append(str(it))
-                    return out
-
-                red_exec = _stringify_items(execution_analysis.get("redundancies", []))
-                ineff_exec = _stringify_items(execution_analysis.get("inefficiencies", []))
-
-                # Deduplicate by string value to avoid unhashable dicts
-                all_redundancies = sorted(
-                    set(red_exec + list(learning_result.anti_patterns.redundancies))
-                )
-                all_inefficiencies = sorted(
-                    set(ineff_exec + list(learning_result.anti_patterns.inefficiencies))
+                metadata.setdefault(
+                    "learning_decision",
+                    {
+                        "should_save": learning_result.should_save,
+                        "reason": learning_result.save_reason,
+                    },
                 )
 
-                # Store the deep learning memory using structured data
+                # Store the learning memory using simplified structure
                 memory = {
                     "id": str(uuid4()),
                     "task": metadata.get("task", "Conversation"),
                     "context": full_narrative[:500],
                     "narrative": full_narrative,
-                    "reflection": f"Tactical: {learning_result.tactical_learning}\n\nStrategic: {learning_result.strategic_learning}\n\nMeta: {learning_result.meta_learning}",
-                    "tactical_learning": learning_result.tactical_learning,
-                    "strategic_learning": learning_result.strategic_learning,
-                    "meta_learning": learning_result.meta_learning,
-                    "anti_patterns": {
-                        "description": learning_result.anti_patterns.description,
-                        "redundancies": all_redundancies,
-                        "inefficiencies": all_inefficiencies,
-                    },
+                    "learnings": learning_result.learnings,
+                    "reflection": learning_result.learnings,  # Keep for backward compatibility
                     "execution_metadata": {
                         "tool_counts": execution_analysis.get("tool_counts", {}),
                         "efficiency_score": execution_analysis.get("efficiency_score", 0),
@@ -278,11 +313,10 @@ Extract learnings from this task execution with specific, actionable insights.""
             ui_memory = {
                 "id": memory.get("id"),
                 "task": memory.get("task"),
-                "tactical_learning": memory.get("tactical_learning"),
-                "strategic_learning": memory.get("strategic_learning"),
-                "meta_learning": memory.get("meta_learning"),
+                "learnings": memory.get("learnings"),
                 "confidence_score": memory.get("confidence_score"),
                 "timestamp": timestamp_val.isoformat() if timestamp_val else None,
+                "outcome": memory.get("outcome", "success"),
             }
 
             # Make HTTP PATCH request to update thread state
@@ -335,56 +369,10 @@ Extract learnings from this task execution with specific, actionable insights.""
             # Don't let state update failures break the learning process
             self._logger.exception(f"Error updating thread state for {thread_id}")
 
-    async def _schedule_processing(
-        self,
-        messages: list[BaseMessage],
-        metadata: dict[str, Any],
-    ) -> None:
-        """Schedule background processing with debounce semantics."""
-
-        # Ensure we keep a snapshot of payload to avoid mutation downstream
-        payload = {
-            "messages": deepcopy(messages),
-            "metadata": deepcopy(metadata),
-        }
-
-        async with self._background_lock:
-            if self._background_task and not self._background_task.done():
-                self._background_task.cancel()
-                try:
-                    await self._background_task
-                except asyncio.CancelledError:
-                    pass
-                except Exception:
-                    self._logger.exception("Background learning task error during cancellation")
-
-            self._pending_payload = payload
-            empty_context = contextvars.Context()
-            self._background_task = asyncio.create_task(
-                self._delayed_process(),
-                context=empty_context,
-            )
-
-    async def _delayed_process(self) -> None:
-        try:
-            await asyncio.sleep(max(self._background_delay, 0))
-            async with self._background_lock:
-                payload = self._pending_payload
-                self._pending_payload = None
-
-            if not payload:
-                return
-
-            await self._process_and_store_memory(payload["messages"], payload["metadata"])
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            self._logger.exception("Background learning task failed")
-
     async def submit_conversation_for_learning(
         self,
         messages: list[BaseMessage],
-        delay_seconds: int = 0,  # noqa: ARG002
+        delay_seconds: int | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Submit conversation data for memory processing.
@@ -394,7 +382,7 @@ Extract learnings from this task execution with specific, actionable insights.""
             delay_seconds: Delay before processing (kept for API compatibility)
             metadata: Additional metadata about the conversation
         """
-        await self._schedule_processing(messages, metadata or {})
+        await self._submit_via_reflector(messages, metadata or {}, delay_seconds)
 
     async def submit_task_execution_for_learning(
         self,
@@ -404,7 +392,7 @@ Extract learnings from this task execution with specific, actionable insights.""
         context: str | None = None,
         error: str | None = None,
         duration: float = 0.0,
-        delay_seconds: int = 0,  # noqa: ARG002
+        delay_seconds: int | None = None,
     ) -> None:
         """Submit task execution data for learning.
 
@@ -415,7 +403,7 @@ Extract learnings from this task execution with specific, actionable insights.""
             context: Additional context
             error: Error message if failed
             duration: Execution duration
-            delay_seconds: Delay before processing (kept for API compatibility)
+            delay_seconds: Delay before processing (defaults to env-configured value)
         """
         # Convert execution data to messages for memory processing
         messages: list[BaseMessage] = []
@@ -450,7 +438,7 @@ Extract learnings from this task execution with specific, actionable insights.""
             "learning_signals": learning_signals,
         }
 
-        await self._schedule_processing(messages, metadata)
+        await self._submit_via_reflector(messages, metadata, delay_seconds)
 
     async def get_recent_memories(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recently processed memories from storage."""
@@ -464,14 +452,8 @@ Extract learnings from this task execution with specific, actionable insights.""
         """Search for similar tasks and return their learnings."""
         return await self.storage.search_similar_tasks(current_task, limit)
 
-    async def get_processed_memories_for_ui(
-        self,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-        """Get processed memories, patterns, and learning queue for UI display.
-
-        Returns:
-            Tuple of (memories, patterns, learning_queue)
-        """
+    async def get_processed_memories_for_ui(self) -> list[dict[str, Any]]:
+        """Get processed memories for UI display."""
         # Initialize storage if needed
         if not self.storage.pool:
             await self.storage.initialize()
@@ -489,12 +471,12 @@ Extract learnings from this task execution with specific, actionable insights.""
                         "task": memory.get("task", "Unknown task"),
                         "context": memory.get("context"),
                         "narrative": memory.get("narrative", ""),
-                        "reflection": memory.get("reflection", ""),
-                        "tactical_learning": memory.get("tactical_learning"),
-                        "strategic_learning": memory.get("strategic_learning"),
-                        "meta_learning": memory.get("meta_learning"),
-                        "anti_patterns": memory.get("anti_patterns"),
-                        "execution_metadata": memory.get("execution_metadata"),
+                        "learnings": memory.get(
+                            "learnings", memory.get("reflection", "")
+                        ),  # Use learnings, fallback to reflection for backward compat
+                        "reflection": memory.get(
+                            "reflection", ""
+                        ),  # Keep for backward compatibility
                         "confidence_score": memory.get("confidence_score", 0.5),
                         "outcome": memory.get("outcome", "success"),
                         "timestamp": memory.get("timestamp", ""),
@@ -503,27 +485,51 @@ Extract learnings from this task execution with specific, actionable insights.""
                     }
                 )
 
-        # Get patterns and queue from storage
-        patterns = await self.storage.get_patterns(limit=20)
-        learning_queue = await self.storage.get_learning_queue(limit=20)
-
-        return ui_memories, patterns, learning_queue
+        return ui_memories
 
     async def close(self) -> None:
         """Close database connections."""
-        async with self._background_lock:
-            if self._background_task and not self._background_task.done():
-                self._background_task.cancel()
-                try:
-                    await self._background_task
-                except asyncio.CancelledError:
-                    pass
-                except Exception:
-                    self._logger.exception("Error while cancelling background learning task")
-            self._background_task = None
-            self._pending_payload = None
+        try:
+            self._executor.shutdown(wait=True, cancel_futures=True)
+        except Exception:
+            self._logger.exception("Error while shutting down reflection executor")
 
         await self.storage.close()
+
+    async def _submit_via_reflector(
+        self,
+        messages: list[BaseMessage],
+        metadata: dict[str, Any],
+        delay_seconds: int | None,
+    ) -> None:
+        """Submit payload to the reflection executor with proper formatting."""
+
+        try:
+            payload = {
+                "messages": convert_to_openai_messages(deepcopy(messages)),
+                "metadata": deepcopy(metadata),
+            }
+
+            namespace_id = metadata.get("langgraph_user_id") or metadata.get("thread_id")
+            configurable: dict[str, Any] = {}
+            if namespace_id:
+                configurable["langgraph_user_id"] = namespace_id
+
+            config = {"configurable": configurable} if configurable else None
+
+            thread_id = metadata.get("thread_id")
+            effective_delay = (
+                max(delay_seconds, 0) if delay_seconds is not None else max(self._default_delay, 0)
+            )
+
+            self._executor.submit(
+                payload,
+                config=config,
+                after_seconds=effective_delay,
+                thread_id=thread_id,
+            )
+        except Exception:
+            self._logger.exception("Failed to submit learning payload to reflection executor")
 
 
 # Global instance for the learning system

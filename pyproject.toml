@@ -207,6 +207,8 @@ module = [
     "browser_use.*",
     "mcp.*",
     "langchain_mcp_adapters.*",
+    "copilotkit",
+    "copilotkit.*",
     "learning_agent.ui.terminal",
     "asyncpg",
     "asyncpg.*",

@@ -220,3 +220,5 @@ services:
 - Use playwright MCP to test the frontend
 - Use docker to test the integration
 - if you want to test the code after a change you need to rebuild the docker container
+- Do not start, stop or rebuild docker on your own, you are proven to stupid to do it.
+- ask the user to rebuild and restart instead.

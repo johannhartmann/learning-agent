@@ -56,42 +56,11 @@ export interface Memory {
   task: string;
   context: string | null;
   narrative: string;
-  reflection: string;
-  tactical_learning?: string | null;
-  strategic_learning?: string | null;
-  meta_learning?: string | null;
-  anti_patterns?: {
-    description?: string;
-    redundancies?: string[];
-    inefficiencies?: string[];
-  } | null;
-  execution_metadata?: {
-    tool_counts?: Record<string, number>;
-    efficiency_score?: number;
-    patterns?: Record<string, unknown>;
-    parallelization_opportunities?: string[];
-  } | null;
+  learnings: string;  // Single unified learning field
+  reflection?: string;  // Keep for backward compatibility
   confidence_score?: number;
   outcome: "success" | "failure";
   timestamp: string;
   embedding?: number[] | null;
   similarity?: number;
-}
-
-export interface Pattern {
-  id: string;
-  description: string;
-  confidence: number;
-  success_rate: number;
-  applications: number;
-  last_used: string | null;
-}
-
-export interface ExecutionData {
-  task: string;
-  context: string | null;
-  outcome: "success" | "failure";
-  duration: number;
-  description: string;
-  error: string | null;
 }

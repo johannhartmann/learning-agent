@@ -143,8 +143,6 @@ initial_state: LearningAgentState = {
     "todos": [],
     "files": {},
     "memories": [],
-    "patterns": [],
-    "learning_queue": [],
 }
 
 # Execute task
@@ -235,26 +233,18 @@ Enable in Docker using the `browser` extra (already installed in Dockerfile.serv
 
 ## 🌐 API Server
 
-The FastAPI server provides REST endpoints for accessing memories and patterns:
+The FastAPI server provides a REST endpoint for accessing consolidated memories:
 
-### Endpoints
+### Endpoint
 
-- `GET /memories` - Retrieve stored memories with optional search
-- `GET /patterns` - Get identified patterns with confidence scores
-- `GET /learning-queue` - View items queued for learning
-- `GET /execution-stats` - Get execution efficiency metrics
+- `GET /learnings` - Retrieve persisted learnings for the UI dashboard
 
 ### Example Usage
 
 ```bash
-# Get recent memories
-curl http://localhost:8001/memories?limit=10
+# Get recent learnings used by the UI polling hook
+curl http://localhost:8001/learnings
 
-# Search memories by content
-curl http://localhost:8001/memories?search=fibonacci
-
-# Get high-confidence patterns
-curl http://localhost:8001/patterns?min_confidence=0.8
 ```
 
 ## 🧪 Testing
@@ -291,7 +281,7 @@ make lint
 The agent provides full observability through LangSmith:
 
 1. **Trace Every Decision**: Complete visibility into planning and execution
-2. **Learning Metrics**: Track pattern recognition and application
+2. **Learning Metrics**: Track memory extraction volume and confidence
 3. **Performance Monitoring**: Latency, token usage, and cost tracking
 4. **Anomaly Detection**: Automatic detection of behavioral changes
 
@@ -363,14 +353,14 @@ The Learning Agent uses PostgreSQL with pgvector extension for production-ready 
 ### Features
 - **Multi-Dimensional Learning Storage**: Stores tactical, strategic, and meta-level insights
 - **Semantic Search**: Vector similarity search for finding relevant past experiences
-- **Execution Pattern Analysis**: Tracks tool usage, efficiency scores, and anti-patterns
+- **Execution Metadata Capture**: Tracks tool usage, efficiency scores, and anti-patterns alongside each memory
 - **Scalable**: Production-ready database that can handle millions of memories
+
+Every new request runs a quick similarity search so the agent receives a system message summarizing the most relevant prior learnings, helping it avoid repeating past mistakes.
 
 ### Database Schema
 - **Memories Table**: Stores conversation memories with embeddings
-- **Patterns Table**: Stores identified patterns and their confidence scores
-- **Learning Queue**: Tracks items queued for explicit learning
-- **Execution Metadata**: Stores tool sequences, timings, and efficiency metrics
+- **Execution Metadata**: Stores tool sequences, timings, and efficiency metrics for each memory
 
 ### Connection
 ```env

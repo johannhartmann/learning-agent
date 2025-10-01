@@ -49,10 +49,10 @@ export function ArtifactsGallery() {
         }}
       >
         <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
-          Artifacts
+          Files
         </h2>
         <p className="mt-3 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Generated plots, notebooks, and markdown reports will appear here.
+          Generated files, plots, and reports will appear here.
         </p>
       </section>
     );
@@ -67,7 +67,7 @@ export function ArtifactsGallery() {
       }}
     >
       <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
-        Artifacts
+        Files
       </h2>
       <div className="mt-4 grid gap-4">
         {entries.map(([name, content]) => {

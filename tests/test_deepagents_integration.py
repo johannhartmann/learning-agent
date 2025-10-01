@@ -3,39 +3,17 @@
 import asyncio
 import os
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from learning_agent.agent import create_learning_agent
 from learning_agent.learning.narrative_learner import NarrativeLearner
-from learning_agent.state import ExecutionData, LearningAgentState
 
 
-# Test data classes
-@dataclass
-class Memory:
-    """Test memory class."""
-
-    id: str
-    task: str
-    context: str
-    narrative: str
-    reflection: str
-    outcome: str
-    timestamp: str
-
-
-@dataclass
-class Pattern:
-    """Test pattern class."""
-
-    id: str
-    description: str
-    confidence: float
-    success_rate: float
-    applications: int
+if TYPE_CHECKING:
+    from learning_agent.state import LearningAgentState
 
 
 class TestLearningAgent:
@@ -67,10 +45,6 @@ class TestLearningAgent:
                 "todos": [],
                 "files": {},
                 "memories": [],
-                "patterns": [],
-                "learning_queue": [],
-                "relevant_memories": [],
-                "applicable_patterns": [],
             }
 
             # Invoke agent
@@ -137,51 +111,12 @@ class TestNarrativeLearner:
 class TestLearningState:
     """Test the learning agent state."""
 
-    def test_memory_creation(self):
-        """Test creating a memory."""
-        from datetime import datetime
-        from uuid import uuid4
+    def test_state_fields(self):
+        """Basic smoke check for LearningAgentState typing."""
+        state: LearningAgentState = {
+            "messages": [],
+            "todos": [],
+            "files": {},
+        }
 
-        memory = Memory(
-            id=str(uuid4()),
-            task="Test task",
-            context="Test context",
-            narrative="This is a test narrative",
-            reflection="This is a test reflection",
-            outcome="success",
-            timestamp=datetime.now().isoformat(),
-        )
-
-        assert memory.task == "Test task"
-        assert memory.outcome == "success"
-
-    def test_pattern_creation(self):
-        """Test creating a pattern."""
-        from uuid import uuid4
-
-        pattern = Pattern(
-            id=str(uuid4()),
-            description="Test pattern",
-            confidence=0.9,
-            success_rate=0.85,
-            applications=5,
-        )
-
-        assert pattern.confidence == 0.9
-        assert pattern.success_rate == 0.85
-        assert pattern.applications == 5
-
-    def test_execution_data(self):
-        """Test execution data creation."""
-        exec_data = ExecutionData(
-            task="Test task",
-            context="Test context",
-            outcome="success",
-            duration=2.5,
-            description="Test description",
-            error=None,
-        )
-
-        assert exec_data.task == "Test task"
-        assert exec_data.outcome == "success"
-        assert exec_data.duration == 2.5
+        assert "messages" in state
