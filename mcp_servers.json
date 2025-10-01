@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Configuration for remote HTTPS MCP servers",
+  "servers": {
+    "example-browser": {
+      "url": "https://browser-mcp.example.com",
+      "type": "remote-https",
+      "description": "Example browser automation MCP server (replace with actual URL)",
+      "auth": {
+        "type": "bearer",
+        "token_env": "BROWSER_MCP_TOKEN"
+      },
+      "enabled": false
+    }
+  }
+}
