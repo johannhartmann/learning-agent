@@ -402,7 +402,6 @@ def create_learning_agent(
             final_output: dict[str, Any] | None = None
             fallback_output: dict[str, Any] | None = None
             last_ai_message: BaseMessage | None = None
-            saw_completion_signal = False
 
             stream_adapter: StreamAdapter | None = None
             if writer is not None:
@@ -514,11 +513,6 @@ def create_learning_agent(
                             if isinstance(message, BaseMessage):
                                 last_ai_message = message
 
-                    if event_type == "on_tool_start" and name == "research_done":
-                        saw_completion_signal = True
-                    if event_type == "on_tool_end" and name == "research_done":
-                        saw_completion_signal = True
-
             except Exception as exc:
                 if stream_adapter is not None:
                     stream_adapter.emit_warning(str(exc))
@@ -545,11 +539,6 @@ def create_learning_agent(
             normalized_output = _normalize_subagent_output(subagent_type, final_output)
 
             if stream_adapter is not None:
-                if subagent_type == "research-agent" and not saw_completion_signal:
-                    stream_adapter.emit_synthetic_completion(
-                        "research_done",
-                        normalized_output,
-                    )
                 messages_list = normalized_output.setdefault("messages", [])
                 transcript = stream_adapter.get_transcript()
                 if transcript:
@@ -570,27 +559,6 @@ def create_learning_agent(
                             messages_list.append(AIMessage(content=summary))
 
                 stream_adapter.complete(normalized_output)
-            if (
-                writer is not None
-                and subagent_type == "research-agent"
-                and not saw_completion_signal
-            ):
-                writer(
-                    {
-                        "subagent": subagent_type,
-                        "event": "tool_start",
-                        "tool": "research_done",
-                        "synthetic": True,
-                    }
-                )
-                writer(
-                    {
-                        "subagent": subagent_type,
-                        "event": "tool_end",
-                        "tool": "research_done",
-                        "synthetic": True,
-                    }
-                )
 
             messages = normalized_output.get("messages", [])
             files = normalized_output.get("files", {})

@@ -278,19 +278,6 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
 
     tools_raw = result[0]
 
-    if lc_tool is not None:
-
-        @lc_tool("research_done")  # type: ignore[misc]
-        def _research_done_tool(reason: str | None = None) -> str:
-            """Mark research as complete with an optional reason."""
-            msg = "Research complete"
-            if reason:
-                msg += f": {reason}"
-            return msg
-
-    else:  # pragma: no cover - fallback if adapters not present
-        _research_done_tool = None  # type: ignore[assignment]
-
     tools_prepared: list[Any] = []
 
     # Tools that require a page to be loaded before use
@@ -347,11 +334,6 @@ def create_mcp_browser_tools() -> list[Any]:  # returns LangChain tools when ava
             response_format="content_and_artifact",
         )
         tools_prepared.append(structured)
-
-    if _research_done_tool is not None and not any(
-        getattr(t, "name", "") == "research_done" for t in tools_prepared
-    ):
-        tools_prepared.append(_research_done_tool)
 
     _MCP_TOOLS_CACHE = tools_prepared
 
