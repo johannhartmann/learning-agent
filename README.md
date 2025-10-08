@@ -13,7 +13,8 @@ A sophisticated autonomous agent system that learns from experience, orchestrate
 - **🎭 DeepAgents Framework**: Built on [the upstream deepagents project](https://github.com/langchain-ai/deepagents) for sophisticated agent orchestration, including subagents with their own graphs
 - **🐘 PostgreSQL Vector Storage**: Production-ready vector database with pgvector for semantic memory search
 - **🔄 Multi-Dimensional Learning**: Captures tactical, strategic, and meta-level insights from every execution
-- **⚡ Parallel Sub-Agents**: Two specialized sub-agents (execution-specialist, research-agent)
+- **🧠 Context-Aware Learning Retrieval**: Synthesizes conversation context for intelligent learning search in multi-turn conversations
+- **⚡ Parallel Sub-Agents**: Specialized sub-agent for research tasks (research-agent)
 - **🐍 Python Sandbox**: Secure code execution with Pyodide WebAssembly environment
 - **📊 Visualization Support**: Automatic capture of matplotlib plots, PIL images, and pandas DataFrames
 - **🌐 REST API Server**: FastAPI endpoints for memory retrieval and pattern analysis (port 8001)
@@ -358,6 +359,11 @@ The Learning Agent uses PostgreSQL with pgvector extension for production-ready 
 
 Every new request runs a quick similarity search so the agent receives a system message summarizing the most relevant prior learnings, helping it avoid repeating past mistakes.
 
+The system uses intelligent context synthesis:
+- **First message in a thread**: Uses the raw user message as the search query (fast, no extra LLM call)
+- **Follow-up messages**: Synthesizes the overall task from conversation history using LLM
+- **Example**: "add colors" in a Snake game conversation becomes "add colors to the Snake game" for more relevant learning retrieval
+
 ### Database Schema
 - **Memories Table**: Stores conversation memories with embeddings
 - **Execution Metadata**: Stores tool sequences, timings, and efficiency metrics for each memory
@@ -415,6 +421,11 @@ This project is in active development.
 - [x] Execution pattern analysis
 - [x] Support for multiple LLM providers (OpenAI, Anthropic, Ollama, etc.)
 - [x] CI/CD pipeline with GitHub Actions
+
+### 🔥 Recent Improvements
+- [x] Context-aware learning retrieval with conversation synthesis
+- [x] Fixed research-agent infinite recursion by removing unnecessary `research_done` tool
+- [x] Updated all npm dependencies to fix CVE-2025-57319
 
 ### 🚧 In Progress
 - [ ] Long-term memory consolidation
