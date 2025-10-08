@@ -14,6 +14,8 @@ from langchain_core.messages import SystemMessage
 from langgraph.graph import END, StateGraph
 
 from learning_agent.agent import create_learning_agent
+from learning_agent.config import settings
+from learning_agent.providers import get_chat_model
 from learning_agent.state import LearningAgentState
 
 
@@ -159,13 +161,61 @@ def create_graph() -> Any:
 
         # Find latest human utterance to use as the similarity query
         query: str | None = None
+        human_message_count = 0
+        last_human_content: str | None = None
+
         for message in reversed(messages):
             role = getattr(message, "type", None) or getattr(message, "role", None)
             if role == "human":
                 content = getattr(message, "content", None)
                 if isinstance(content, str) and content.strip():
-                    query = content.strip()
-                    break
+                    if last_human_content is None:
+                        last_human_content = content.strip()
+                    human_message_count += 1
+
+        if not last_human_content:
+            return state
+
+        # Hybrid approach: First message uses raw content, follow-ups synthesize context
+        if human_message_count == 1:
+            # First message: use raw content directly
+            query = last_human_content
+        else:
+            # Follow-up message: synthesize task context from conversation history
+            try:
+                from langchain_core.messages import HumanMessage
+
+                llm = get_chat_model(settings)
+
+                # Build conversation context for synthesis
+                conversation_text = []
+                for msg in messages[-10:]:  # Last 10 messages for context
+                    role = getattr(msg, "type", None) or getattr(msg, "role", None)
+                    content = str(getattr(msg, "content", ""))
+                    if content and role in ("human", "ai", "assistant"):
+                        conversation_text.append(f"{role.upper()}: {content[:200]}")
+
+                synthesis_prompt = f"""Based on this conversation, what is the user trying to accomplish?
+Provide a 1-2 sentence task description that captures the overall goal.
+
+Conversation:
+{chr(10).join(conversation_text)}
+
+Task description:"""
+
+                synthesis_result = await llm.ainvoke([HumanMessage(content=synthesis_prompt)])
+                synthesized = str(getattr(synthesis_result, "content", "")).strip()
+
+                if synthesized:
+                    query = synthesized
+                    logging.getLogger(__name__).info(f"Synthesized task query: {query[:100]}")
+                else:
+                    # Fallback to raw message
+                    query = last_human_content
+            except Exception:
+                # Fallback to raw message if synthesis fails
+                logging.getLogger(__name__).exception("Failed to synthesize task context")
+                query = last_human_content
 
         if not query:
             return state
