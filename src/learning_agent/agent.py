@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Mapping, Sequence
-from html.parser import HTMLParser
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -96,6 +95,40 @@ You have access to standard file operations:
 - `read_file`: Read file contents with line numbers
 - `write_file`: Create or overwrite files
 - `edit_file`: Make precise edits to existing files
+
+## Code-Mode with Remote MCP Servers
+You can use remote MCP tools via Python code in the `python_sandbox`. When MCP servers are configured, the `mcp` namespace is automatically available with type-safe Python APIs.
+
+Example - Browser automation via remote MCP:
+```python
+python_sandbox('''
+# mcp.browser is auto-generated from remote MCP server schema
+browser = mcp.browser
+
+# Type-safe Python methods (not JSON tool calls)
+browser.goto("https://news.ycombinator.com")
+browser.wait_for_timeout(1000)
+
+# Extract data with natural Python code
+result = browser.extract_structured_data(
+    query="top 5 article titles with URLs"
+)
+print(result['content'])
+
+# Complex workflows with loops and conditionals
+urls = ['https://hn.com', 'https://reddit.com/r/python']
+for url in urls:
+    browser.goto(url)
+    data = browser.extract_structured_data("headlines")
+    print(f"{url}: {data}")
+''')
+```
+
+Benefits of code-mode:
+- Write natural Python instead of repeated tool calls
+- Use loops, conditionals, error handling
+- More efficient multi-step workflows
+- Leverage LLM's coding ability
 
 ## Planning and Execution
 - For any non-trivial or multi-step task (building code, creating multiple files, extended analysis), your FIRST ACTION MUST be a `write_todos` call that breaks down the work.
@@ -201,68 +234,13 @@ def _normalize_subagent_output(subagent_type: str, output: Any) -> dict[str, Any
     return normalized
 
 
-class _HeadlineParser(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self._current_href: str | None = None
-        self._buffer: list[str] = []
-        self.headlines: list[tuple[str, str]] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag != "a":
-            return
-        href = dict(attrs).get("href")
-        if not href:
-            return
-        self._current_href = href
-        self._buffer = []
-
-    def handle_data(self, data: str) -> None:
-        if self._current_href is None:
-            return
-        stripped = data.strip()
-        if stripped:
-            self._buffer.append(stripped)
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag != "a" or self._current_href is None:
-            return
-        text = " ".join(self._buffer).strip()
-        href = self._current_href
-        self._current_href = None
-        self._buffer = []
-        if not text:
-            return
-        if len(text) < 20:
-            return
-        lowered = text.lower()
-        if any(prefix in lowered for prefix in ("mehr", "weiter", "anzeige")):
-            return
-        if href.startswith("/"):
-            href = f"https://www.stern.de{href}"
-        self.headlines.append((text, href))
-
-
 def _summarize_research_extracts(extracts: list[str]) -> str:
-    parser = _HeadlineParser()
-    for snippet in extracts:
-        try:
-            parser.feed(snippet)
-        except Exception:
-            continue
-    seen: set[str] = set()
-    bullets: list[str] = []
-    for title, url in parser.headlines:
-        key = title.strip()
-        if key in seen:
-            continue
-        seen.add(key)
-        bullets.append(f"- [{title}]({url})")
-        if len(bullets) >= 5:
-            break
-    if not bullets:
+    if not extracts:
         return ""
-    return "Top findings:\n" + "\n".join(bullets)
+    combined = "\n\n".join(snippet.strip() for snippet in extracts if snippet.strip())
+    if not combined:
+        return ""
+    return f"Research findings:\n\n{combined}"
 
 
 def create_learning_agent(
@@ -424,14 +402,13 @@ def create_learning_agent(
             final_output: dict[str, Any] | None = None
             fallback_output: dict[str, Any] | None = None
             last_ai_message: BaseMessage | None = None
-            saw_completion_signal = False
 
             stream_adapter: StreamAdapter | None = None
             if writer is not None:
                 stream_adapter = StreamAdapter(
                     writer,
                     agent_label=subagent_type,
-                    parent_id=tool_call_id,
+                    parentMessageId=tool_call_id,
                     profile="user",
                 )
                 stream_adapter.begin(
@@ -536,11 +513,6 @@ def create_learning_agent(
                             if isinstance(message, BaseMessage):
                                 last_ai_message = message
 
-                    if event_type == "on_tool_start" and name == "research_done":
-                        saw_completion_signal = True
-                    if event_type == "on_tool_end" and name == "research_done":
-                        saw_completion_signal = True
-
             except Exception as exc:
                 if stream_adapter is not None:
                     stream_adapter.emit_warning(str(exc))
@@ -567,37 +539,26 @@ def create_learning_agent(
             normalized_output = _normalize_subagent_output(subagent_type, final_output)
 
             if stream_adapter is not None:
-                if subagent_type == "research-agent" and not saw_completion_signal:
-                    stream_adapter.emit_synthetic_completion(
-                        "research_done",
-                        normalized_output,
-                    )
+                messages_list = normalized_output.setdefault("messages", [])
                 transcript = stream_adapter.get_transcript()
                 if transcript:
-                    messages_list = normalized_output.setdefault("messages", [])
                     messages_list.append(AIMessage(content=transcript))
+
+                # Add structured research data (headlines, URLs) to agent context
+                if subagent_type == "research-agent":
+                    structured_content = stream_adapter.get_structured_content()
+                    print(f"[DEBUG] structured_content length: {len(structured_content)}")
+                    if structured_content:
+                        for i, content in enumerate(structured_content[:2]):
+                            print(f"[DEBUG] structured_content[{i}] preview: {content[:500]}")
+                        summary = _summarize_research_extracts(structured_content)
+                        print(
+                            f"[DEBUG] summary from _summarize_research_extracts: {summary[:500] if summary else 'EMPTY'}"
+                        )
+                        if summary:
+                            messages_list.append(AIMessage(content=summary))
+
                 stream_adapter.complete(normalized_output)
-            if (
-                writer is not None
-                and subagent_type == "research-agent"
-                and not saw_completion_signal
-            ):
-                writer(
-                    {
-                        "subagent": subagent_type,
-                        "event": "tool_start",
-                        "tool": "research_done",
-                        "synthetic": True,
-                    }
-                )
-                writer(
-                    {
-                        "subagent": subagent_type,
-                        "event": "tool_end",
-                        "tool": "research_done",
-                        "synthetic": True,
-                    }
-                )
 
             messages = normalized_output.get("messages", [])
             files = normalized_output.get("files", {})

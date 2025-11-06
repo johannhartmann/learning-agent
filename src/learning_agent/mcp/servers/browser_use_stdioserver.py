@@ -23,16 +23,19 @@ import json
 import os
 import re
 from typing import Any
+
+
 try:
-    from playwright.async_api import async_playwright, Page
+    from playwright.async_api import Page, async_playwright
+
     HAVE_PW = True
 except Exception:  # pragma: no cover - optional dependency path
     async_playwright = None  # type: ignore[assignment]
-    Page = object  # type: ignore[assignment]
+    Page = object  # type: ignore[misc,assignment]
     HAVE_PW = False
-from bs4 import BeautifulSoup
-from mcp.server.fastmcp import FastMCP
 import logging
+
+from mcp.server.fastmcp import FastMCP
 
 
 mcp = FastMCP("BrowserUse")
@@ -42,7 +45,7 @@ logger = logging.getLogger(__name__)
 _pw = None
 _pw_browser = None
 _pw_context = None
-_pw_page: Page | None = None  # type: ignore[assignment]
+_pw_page: Page | None = None
 
 MAX_STRUCTURED_CHARS = 30_000
 
@@ -86,53 +89,65 @@ async def _ensure_playwright() -> Page:
     return _pw_page
 
 
-def _get_llm():
-    # No LLM used in Playwright-only implementation. Kept for compatibility.
-    return None
+def _get_llm() -> Any:
+    """Get LLM for content extraction."""
+    model = os.getenv("BROWSER_EXTRACTION_MODEL")
+
+    if not model:
+        if os.getenv("ANTHROPIC_API_KEY"):
+            model = "claude-3-5-haiku-20241022"
+        elif os.getenv("OPENAI_API_KEY"):
+            model = "gpt-4o-mini"
+        else:
+            raise RuntimeError("No LLM API key found (ANTHROPIC_API_KEY or OPENAI_API_KEY)")
+
+    try:
+        if model.startswith("claude"):
+            from langchain_anthropic import ChatAnthropic
+
+            return ChatAnthropic(model=model, temperature=0)
+        if model.startswith("gpt"):
+            from langchain_openai import ChatOpenAI
+
+            return ChatOpenAI(model=model, temperature=0)  # type: ignore[call-arg]
+        raise ValueError(f"Unsupported model: {model}")
+    except ImportError as e:
+        raise RuntimeError(f"LLM provider not available: {e}") from e
 
 
-def _clean_page_content(html: str, extract_links: bool = False) -> tuple[str, dict[str, Any], list[dict[str, str]]]:
-    """Convert raw HTML into a whitespace-normalised plaintext snippet."""
-    soup = BeautifulSoup(html, "html.parser")
-    for tag in soup(["script", "style", "noscript", "iframe", "svg", "canvas"]):
-        tag.decompose()
+def _clean_page_content(
+    html: str, extract_links: bool = False
+) -> tuple[str, dict[str, Any], list[dict[str, str]]]:
+    """Convert raw HTML into markdown using html2text (browser-use's approach)."""
+    import html2text
 
-    links: list[dict[str, str]] = []
-    if extract_links:
-        for anchor in soup.find_all("a"):
-            text = anchor.get_text(" ", strip=True)
-            href = anchor.get("href") or ""
-            if text or href:
-                links.append({"text": text, "href": href})
-        # Deduplicate while preserving order and limit volume
-        seen: set[tuple[str, str]] = set()
-        unique_links: list[dict[str, str]] = []
-        for item in links:
-            key = (item["text"], item["href"])
-            if key in seen:
-                continue
-            seen.add(key)
-            unique_links.append(item)
-            if len(unique_links) >= 100:
-                break
-        links = unique_links
+    h = html2text.HTML2Text()
+    h.ignore_images = True
+    h.ignore_links = not extract_links
+    h.body_width = 0
+    h.unicode_snob = True
 
-    text_raw = soup.get_text("\n")
+    markdown_raw = h.handle(html)
+
     collapsed_lines: list[str] = []
-    for line in text_raw.splitlines():
-        normalised = re.sub(r"\s+", " ", line).strip()
-        if normalised:
-            collapsed_lines.append(normalised)
-    cleaned_text = "\n".join(collapsed_lines)
+    for line in markdown_raw.splitlines():
+        stripped = line.strip()
+        if len(stripped) > 1:
+            collapsed_lines.append(line)
+
+    cleaned_markdown = "\n".join(collapsed_lines)
+    cleaned_markdown = re.sub(r"\n{3,}", "\n\n", cleaned_markdown)
 
     stats = {
         "original_html_chars": len(html),
-        "initial_text_chars": len(text_raw),
-        "filtered_text_chars": len(cleaned_text),
-        "filtered_chars_removed": max(len(text_raw) - len(cleaned_text), 0),
+        "initial_text_chars": len(markdown_raw),
+        "filtered_text_chars": len(cleaned_markdown),
+        "filtered_chars_removed": max(len(markdown_raw) - len(cleaned_markdown), 0),
     }
 
-    return cleaned_text, stats, links
+    links: list[dict[str, str]] = []
+
+    return cleaned_markdown, stats, links
 
 
 def _smart_truncate(text: str, limit: int = MAX_STRUCTURED_CHARS) -> int:
@@ -174,7 +189,9 @@ async def wait_for_timeout(timeout: float) -> str:
         raise RuntimeError("playwright not available")
     page = await _ensure_playwright()
     await page.wait_for_timeout(timeout)
-    return json.dumps({"action": "wait_for_timeout", "status": "ok", "timeout": timeout, "url": page.url})
+    return json.dumps(
+        {"action": "wait_for_timeout", "status": "ok", "timeout": timeout, "url": page.url}
+    )
 
 
 @mcp.tool()
@@ -195,7 +212,15 @@ async def mouse_wheel(delta_x: float = 0, delta_y: float = 0) -> str:
         raise RuntimeError("playwright not available")
     page = await _ensure_playwright()
     await page.mouse.wheel(delta_x, delta_y)
-    return json.dumps({"action": "mouse_wheel", "status": "ok", "delta_x": delta_x, "delta_y": delta_y, "url": page.url})
+    return json.dumps(
+        {
+            "action": "mouse_wheel",
+            "status": "ok",
+            "delta_x": delta_x,
+            "delta_y": delta_y,
+            "url": page.url,
+        }
+    )
 
 
 @mcp.tool()
@@ -271,7 +296,7 @@ async def extract_structured_data(
     extract_links: bool = False,
     start_from_char: int = 0,
 ) -> str:
-    """Return filtered page content suitable for downstream structured extraction."""
+    """Extract relevant information from page using LLM (browser-use strategy)."""
     if not HAVE_PW:
         raise RuntimeError("playwright not available")
     if start_from_char < 0:
@@ -298,23 +323,44 @@ async def extract_structured_data(
     truncate_at = _smart_truncate(segment_source, MAX_STRUCTURED_CHARS)
     segment = segment_source[:truncate_at]
     truncated = start_from_char + truncate_at < total_chars
-    next_start = start_from_char + truncate_at if truncated else None
+
+    llm = _get_llm()
+    extraction_prompt = f"""Extract relevant information from this webpage based on the user's query.
+
+Query: {query}
+
+Page URL: {page.url}
+
+Page content (markdown):
+{segment}
+
+Instructions:
+- Extract ONLY the information relevant to the query
+- Ignore ads, navigation, recommended links, and unrelated content
+- Format the response clearly and concisely
+- If the query asks for headlines/links, include them in markdown format [title](url)
+- If the query asks for specific data (contact info, prices, etc.), extract just that data
+
+Return ONLY the extracted relevant information:"""
+
+    try:
+        response = await llm.ainvoke(extraction_prompt)
+        extracted_content = response.content if hasattr(response, "content") else str(response)
+    except Exception:
+        logger.exception("LLM extraction failed")
+        extracted_content = segment
 
     payload: dict[str, Any] = {
         "action": "extract_structured_data",
         "status": "ok",
         "query": query,
         "url": page.url,
-        "content": segment,
+        "content": extracted_content,
         "start_from_char": start_from_char,
         "truncated": truncated,
         "total_filtered_chars": total_chars,
         "stats": stats,
     }
-    if next_start is not None:
-        payload["next_start_char"] = next_start
-    if extract_links and links:
-        payload["links"] = links
 
     return json.dumps(payload)
 

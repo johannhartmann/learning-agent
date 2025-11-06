@@ -13,7 +13,8 @@ A sophisticated autonomous agent system that learns from experience, orchestrate
 - **🎭 DeepAgents Framework**: Built on [the upstream deepagents project](https://github.com/langchain-ai/deepagents) for sophisticated agent orchestration, including subagents with their own graphs
 - **🐘 PostgreSQL Vector Storage**: Production-ready vector database with pgvector for semantic memory search
 - **🔄 Multi-Dimensional Learning**: Captures tactical, strategic, and meta-level insights from every execution
-- **⚡ Parallel Sub-Agents**: Two specialized sub-agents (execution-specialist, research-agent)
+- **🧠 Context-Aware Learning Retrieval**: Synthesizes conversation context for intelligent learning search in multi-turn conversations
+- **⚡ Parallel Sub-Agents**: Specialized sub-agent for research tasks (research-agent)
 - **🐍 Python Sandbox**: Secure code execution with Pyodide WebAssembly environment
 - **📊 Visualization Support**: Automatic capture of matplotlib plots, PIL images, and pandas DataFrames
 - **🌐 REST API Server**: FastAPI endpoints for memory retrieval and pattern analysis (port 8001)
@@ -143,8 +144,6 @@ initial_state: LearningAgentState = {
     "todos": [],
     "files": {},
     "memories": [],
-    "patterns": [],
-    "learning_queue": [],
 }
 
 # Execute task
@@ -235,26 +234,18 @@ Enable in Docker using the `browser` extra (already installed in Dockerfile.serv
 
 ## 🌐 API Server
 
-The FastAPI server provides REST endpoints for accessing memories and patterns:
+The FastAPI server provides a REST endpoint for accessing consolidated memories:
 
-### Endpoints
+### Endpoint
 
-- `GET /memories` - Retrieve stored memories with optional search
-- `GET /patterns` - Get identified patterns with confidence scores
-- `GET /learning-queue` - View items queued for learning
-- `GET /execution-stats` - Get execution efficiency metrics
+- `GET /learnings` - Retrieve persisted learnings for the UI dashboard
 
 ### Example Usage
 
 ```bash
-# Get recent memories
-curl http://localhost:8001/memories?limit=10
+# Get recent learnings used by the UI polling hook
+curl http://localhost:8001/learnings
 
-# Search memories by content
-curl http://localhost:8001/memories?search=fibonacci
-
-# Get high-confidence patterns
-curl http://localhost:8001/patterns?min_confidence=0.8
 ```
 
 ## 🧪 Testing
@@ -291,7 +282,7 @@ make lint
 The agent provides full observability through LangSmith:
 
 1. **Trace Every Decision**: Complete visibility into planning and execution
-2. **Learning Metrics**: Track pattern recognition and application
+2. **Learning Metrics**: Track memory extraction volume and confidence
 3. **Performance Monitoring**: Latency, token usage, and cost tracking
 4. **Anomaly Detection**: Automatic detection of behavioral changes
 
@@ -363,14 +354,19 @@ The Learning Agent uses PostgreSQL with pgvector extension for production-ready 
 ### Features
 - **Multi-Dimensional Learning Storage**: Stores tactical, strategic, and meta-level insights
 - **Semantic Search**: Vector similarity search for finding relevant past experiences
-- **Execution Pattern Analysis**: Tracks tool usage, efficiency scores, and anti-patterns
+- **Execution Metadata Capture**: Tracks tool usage, efficiency scores, and anti-patterns alongside each memory
 - **Scalable**: Production-ready database that can handle millions of memories
+
+Every new request runs a quick similarity search so the agent receives a system message summarizing the most relevant prior learnings, helping it avoid repeating past mistakes.
+
+The system uses intelligent context synthesis:
+- **First message in a thread**: Uses the raw user message as the search query (fast, no extra LLM call)
+- **Follow-up messages**: Synthesizes the overall task from conversation history using LLM
+- **Example**: "add colors" in a Snake game conversation becomes "add colors to the Snake game" for more relevant learning retrieval
 
 ### Database Schema
 - **Memories Table**: Stores conversation memories with embeddings
-- **Patterns Table**: Stores identified patterns and their confidence scores
-- **Learning Queue**: Tracks items queued for explicit learning
-- **Execution Metadata**: Stores tool sequences, timings, and efficiency metrics
+- **Execution Metadata**: Stores tool sequences, timings, and efficiency metrics for each memory
 
 ### Connection
 ```env
@@ -425,6 +421,11 @@ This project is in active development.
 - [x] Execution pattern analysis
 - [x] Support for multiple LLM providers (OpenAI, Anthropic, Ollama, etc.)
 - [x] CI/CD pipeline with GitHub Actions
+
+### 🔥 Recent Improvements
+- [x] Context-aware learning retrieval with conversation synthesis
+- [x] Fixed research-agent infinite recursion by removing unnecessary `research_done` tool
+- [x] Updated all npm dependencies to fix CVE-2025-57319
 
 ### 🚧 In Progress
 - [ ] Long-term memory consolidation

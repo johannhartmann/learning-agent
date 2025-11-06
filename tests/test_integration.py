@@ -2,39 +2,17 @@
 
 import os
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from learning_agent.agent import create_learning_agent
 from learning_agent.learning.narrative_learner import NarrativeLearner
-from learning_agent.state import ExecutionData, LearningAgentState
 
 
-# Test data classes
-@dataclass
-class Memory:
-    """Test memory class."""
-
-    id: str
-    task: str
-    context: str
-    narrative: str
-    reflection: str
-    outcome: str
-    timestamp: str
-
-
-@dataclass
-class Pattern:
-    """Test pattern class."""
-
-    id: str
-    description: str
-    confidence: float
-    success_rate: float
-    applications: int
+if TYPE_CHECKING:
+    from learning_agent.state import LearningAgentState
 
 
 @pytest.fixture
@@ -126,10 +104,6 @@ class TestDeepAgentsIntegration:
             "todos": [],
             "files": {},
             "memories": [],
-            "patterns": [],
-            "learning_queue": [],
-            "relevant_memories": [],
-            "applicable_patterns": [],
         }
 
         result = await agent.ainvoke(initial_state)
@@ -137,60 +111,6 @@ class TestDeepAgentsIntegration:
         assert result is not None
         assert "messages" in result
         assert len(result["messages"]) > 1
-
-
-class TestLearningState:
-    """Test learning state components."""
-
-    def test_memory_creation(self):
-        """Test creating a memory."""
-        from datetime import datetime
-        from uuid import uuid4
-
-        memory = Memory(
-            id=str(uuid4()),
-            task="Test task",
-            context="Test context",
-            narrative="Test narrative",
-            reflection="Test reflection",
-            outcome="success",
-            timestamp=datetime.now().isoformat(),
-        )
-
-        assert memory.task == "Test task"
-        assert memory.outcome == "success"
-        assert memory.context == "Test context"
-
-    def test_pattern_creation(self):
-        """Test creating a pattern."""
-        from uuid import uuid4
-
-        pattern = Pattern(
-            id=str(uuid4()),
-            description="Test pattern",
-            confidence=0.8,
-            success_rate=0.9,
-            applications=3,
-        )
-
-        assert pattern.confidence == 0.8
-        assert pattern.success_rate == 0.9
-        assert pattern.applications == 3
-
-    def test_execution_data(self):
-        """Test execution data."""
-        exec_data = ExecutionData(
-            task="Test task",
-            context="Test context",
-            outcome="failure",
-            duration=3.5,
-            description="Test failed",
-            error="Test error",
-        )
-
-        assert exec_data.task == "Test task"
-        assert exec_data.outcome == "failure"
-        assert exec_data.error == "Test error"
 
 
 class TestSandboxIntegration:

@@ -10,9 +10,12 @@ import importlib.util
 import os
 from typing import Any
 
+from langchain_core.messages import SystemMessage
 from langgraph.graph import END, StateGraph
 
 from learning_agent.agent import create_learning_agent
+from learning_agent.config import settings
+from learning_agent.providers import get_chat_model
 from learning_agent.state import LearningAgentState
 
 
@@ -149,12 +152,137 @@ def create_graph() -> Any:
         # Return state unchanged - this is a side-effect only node
         return state
 
+    async def fetch_relevant_learnings_node(state: LearningAgentState) -> LearningAgentState:
+        """Enrich the conversation with relevant prior learnings before execution."""
+
+        from learning_agent.learning.langmem_integration import get_learning_system
+
+        messages = list(state.get("messages", []) or [])
+
+        # Find latest human utterance to use as the similarity query
+        query: str | None = None
+        human_message_count = 0
+        last_human_content: str | None = None
+
+        for message in reversed(messages):
+            role = getattr(message, "type", None) or getattr(message, "role", None)
+            if role == "human":
+                content = getattr(message, "content", None)
+                if isinstance(content, str) and content.strip():
+                    if last_human_content is None:
+                        last_human_content = content.strip()
+                    human_message_count += 1
+
+        if not last_human_content:
+            return state
+
+        # Hybrid approach: First message uses raw content, follow-ups synthesize context
+        if human_message_count == 1:
+            # First message: use raw content directly
+            query = last_human_content
+        else:
+            # Follow-up message: synthesize task context from conversation history
+            try:
+                from langchain_core.messages import HumanMessage
+
+                llm = get_chat_model(settings)
+
+                # Build conversation context for synthesis
+                conversation_text = []
+                for msg in messages[-10:]:  # Last 10 messages for context
+                    role = getattr(msg, "type", None) or getattr(msg, "role", None)
+                    content = str(getattr(msg, "content", ""))
+                    if content and role in ("human", "ai", "assistant"):
+                        conversation_text.append(f"{role.upper()}: {content[:200]}")
+
+                synthesis_prompt = f"""Based on this conversation, what is the user trying to accomplish?
+Provide a 1-2 sentence task description that captures the overall goal.
+
+Conversation:
+{chr(10).join(conversation_text)}
+
+Task description:"""
+
+                synthesis_result = await llm.ainvoke([HumanMessage(content=synthesis_prompt)])
+                synthesized = str(getattr(synthesis_result, "content", "")).strip()
+
+                if synthesized:
+                    query = synthesized
+                    logging.getLogger(__name__).info(f"Synthesized task query: {query[:100]}")
+                else:
+                    # Fallback to raw message
+                    query = last_human_content
+            except Exception:
+                # Fallback to raw message if synthesis fails
+                logging.getLogger(__name__).exception("Failed to synthesize task context")
+                query = last_human_content
+
+        if not query:
+            return state
+
+        learning_system = get_learning_system()
+        try:
+            prior = await learning_system.search_similar_tasks(query, limit=3)
+        except Exception as exc:  # pragma: no cover - defensive logging only
+            logging.getLogger(__name__).exception("Failed to fetch similar learnings", exc_info=exc)
+            return state
+
+        if not prior:
+            return state
+
+        lines: list[str] = ["Relevant prior learnings from similar tasks:"]
+        summaries: list[str] = []
+        for item in prior:
+            task_name = item.get("similar_task") or item.get("task") or "Unknown task"
+            outcome = item.get("outcome") or "unknown"
+            confidence = item.get("confidence_score") or 0.0
+
+            parts = [f"Task: {task_name} (outcome: {outcome}, confidence: {confidence:.2f})"]
+
+            for key, label in (
+                ("tactical_learning", "Tactical"),
+                ("strategic_learning", "Strategic"),
+                ("meta_learning", "Meta"),
+            ):
+                value = (item.get(key) or "").strip()
+                if value:
+                    parts.append(f"{label}: {value}")
+
+            anti = item.get("anti_patterns") or {}
+            anti_parts: list[str] = []
+            if isinstance(anti, dict):
+                desc = (anti.get("description") or "").strip()
+                if desc:
+                    anti_parts.append(desc)
+                anti_parts.extend(
+                    f"Redundancy: {red}" for red in (anti.get("redundancies") or [])[:2]
+                )
+                anti_parts.extend(
+                    f"Inefficiency: {ineff}" for ineff in (anti.get("inefficiencies") or [])[:2]
+                )
+            if anti_parts:
+                parts.append("Anti-patterns: " + "; ".join(anti_parts))
+
+            summary = "\n".join(parts)
+            summaries.append(summary)
+            lines.append(summary)
+
+        system_message = SystemMessage(content="\n\n".join(lines))
+        updated_messages = [*messages, system_message]
+
+        new_state = dict(state)
+        new_state["messages"] = updated_messages
+        new_state["relevant_learnings"] = summaries
+        return new_state  # type: ignore[return-value]
+
     # Add nodes to the graph
+    workflow.add_node("fetch_relevant_learnings", fetch_relevant_learnings_node)
     workflow.add_node("agent", cast("Any", agent))
     workflow.add_node("submit_learning", submit_learning_node)
 
     # Define the flow
-    workflow.set_entry_point("agent")
+    workflow.set_entry_point("fetch_relevant_learnings")
+    workflow.add_edge("fetch_relevant_learnings", "agent")
     workflow.add_edge("agent", "submit_learning")
     workflow.add_edge("submit_learning", END)
 

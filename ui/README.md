@@ -4,7 +4,7 @@ This Next.js app uses **CopilotKit** to render the LangGraph/DeepAgents assistan
 
 - A CopilotKit chat panel bound to the LangGraph agent
 - A task list sourced from `state.todos`
-- A learning dashboard that streams `state.memories`, `state.patterns`, and `state.learning_queue`
+- A learning dashboard that polls `/api/learnings` for persisted memories while also rendering live state updates
 - An artifact gallery that renders sandbox files (markdown + images)
 
 ## Environment setup

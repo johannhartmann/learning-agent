@@ -52,6 +52,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "pgvector>=0.2.5",
     "beautifulsoup4>=4.12.0",
+    "html2text>=2025.4.15",
 ]
 
 [project.urls]
@@ -206,6 +207,8 @@ module = [
     "browser_use.*",
     "mcp.*",
     "langchain_mcp_adapters.*",
+    "copilotkit",
+    "copilotkit.*",
     "learning_agent.ui.terminal",
     "asyncpg",
     "asyncpg.*",
@@ -221,6 +224,8 @@ module = [
     "typer",
     "rich.*",
     "dotenv",
+    "html2text",
+    "playwright.*",
 ]
 ignore_missing_imports = true
 

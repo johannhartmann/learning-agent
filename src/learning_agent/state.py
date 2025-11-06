@@ -40,6 +40,10 @@ class LearningAgentState(DeepAgentState):  # type: ignore[misc]
 
     # Inherit `files` aggregation behavior from DeepAgentState (file_reducer merges dicts)
 
+    # Current session's learning data for UI display
+    memories: NotRequired[list[dict[str, Any]]]  # type: ignore[valid-type]
+    patterns: NotRequired[list[dict[str, Any]]]  # type: ignore[valid-type]
+
     # Optional fields produced by downstream nodes/tools that aren't part of the core schema
     # Adding them here avoids "unknown channel" warnings in LangGraph when nodes pass state through
     remaining_steps: NotRequired[int]  # type: ignore[valid-type]

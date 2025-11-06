@@ -3,89 +3,94 @@
 import { useMemo } from "react";
 import { useCoAgent } from "@copilotkit/react-core";
 
-import type { ExecutionData, Memory, Pattern } from "@/app/types/types";
+import type { Memory } from "@/app/types/types";
+import { useLearningPolling } from "@/hooks/useLearningPolling";
 import { LEARNING_AGENT_KEY, type LearningAgentState } from "./types";
 
 function MemoryCard({ memory }: { memory: Memory }) {
   return (
-    <article className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 text-sm text-neutral-900">
-      <header className="mb-2 flex items-center justify-between gap-2">
-        <span className="font-semibold text-indigo-700">{memory.task}</span>
-        <span className="text-xs uppercase tracking-wide text-neutral-500">{memory.outcome}</span>
+    <article
+      className="rounded-lg border p-4 text-sm space-y-3"
+      style={{
+        borderColor: "var(--color-border)",
+        backgroundColor: "var(--color-background)",
+        color: "var(--color-text-primary)"
+      }}
+    >
+      <header className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <h3 className="font-semibold text-base mb-1" style={{ color: "var(--color-primary)" }}>
+            {memory.task}
+          </h3>
+          {memory.confidence_score && (
+            <span className="text-xs" style={{ color: "var(--color-text-tertiary)" }}>
+              Confidence: {(memory.confidence_score * 100).toFixed(0)}%
+            </span>
+          )}
+        </div>
+        <span className="text-xs uppercase tracking-wide px-2 py-1 rounded"
+          style={{
+            backgroundColor: memory.outcome === "success" ? "var(--color-success-bg)" : "var(--color-error-bg)",
+            color: memory.outcome === "success" ? "var(--color-success)" : "var(--color-error)"
+          }}>
+          {memory.outcome}
+        </span>
       </header>
-      <p className="text-sm text-neutral-800">{memory.narrative}</p>
-      {memory.reflection ? (
-        <p className="mt-2 text-xs text-neutral-600">
-          <span className="font-medium text-neutral-700">Reflection:</span> {memory.reflection}
-        </p>
-      ) : null}
-    </article>
-  );
-}
 
-function PatternCard({ pattern }: { pattern: Pattern }) {
-  return (
-    <article className="rounded-lg border border-amber-100 bg-amber-50/60 p-3 text-sm text-neutral-900">
-      <header className="mb-1 flex items-center justify-between gap-2">
-        <span className="font-semibold text-amber-700">Pattern #{pattern.id}</span>
-        <span className="text-xs text-neutral-500">Confidence {Math.round(pattern.confidence * 100)}%</span>
-      </header>
-      <p className="text-sm text-neutral-800">{pattern.description}</p>
-    </article>
-  );
-}
+      {/* Display learning content */}
+      {memory.learnings && (
+        <div>
+          <h4 className="font-medium text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>
+            Key Learnings
+          </h4>
+          <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--color-text-primary)" }}>
+            {memory.learnings}
+          </p>
+        </div>
+      )}
 
-function QueueCard({ item }: { item: ExecutionData }) {
-  return (
-    <article className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-neutral-900">
-      <header className="mb-1 flex items-center justify-between gap-2">
-        <span className="font-semibold text-slate-700">{item.task}</span>
-        <span className="text-xs text-neutral-500">{item.outcome}</span>
-      </header>
-      {item.description ? <p className="text-sm text-neutral-800">{item.description}</p> : null}
-      {item.error ? (
-        <p className="mt-1 text-xs text-red-600">{item.error}</p>
-      ) : null}
+      <footer className="text-xs" style={{ color: "var(--color-text-tertiary)" }}>
+        {new Date(memory.timestamp).toLocaleString()}
+      </footer>
     </article>
   );
 }
 
 export function LearningPanel() {
   const { state } = useCoAgent<LearningAgentState>({ name: LEARNING_AGENT_KEY });
+  const { learnings, isLoading, error } = useLearningPolling();
 
   const memories = useMemo(() => state?.memories ?? [], [state?.memories]);
-  const patterns = useMemo(() => state?.patterns ?? [], [state?.patterns]);
-  const learningQueue = useMemo(() => state?.learning_queue ?? [], [state?.learning_queue]);
+
+  // Get only the 5 most recent learnings (sorted by timestamp, newest first)
+  const displayedMemories = useMemo(() => {
+    const allMemories = learnings.length > 0 ? learnings : memories;
+    return allMemories
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 5);
+  }, [learnings, memories]);
 
   return (
-    <div className="grid gap-6">
-      <section>
-        <h2 className="text-base font-semibold text-neutral-900">Memories</h2>
-        <div className="mt-3 grid gap-3">
-          {memories.length === 0 ? (
-            <p className="text-sm text-neutral-500">Learning memories will appear here once the agent reflects.</p>
+    <div className="grid gap-4">
+      <section
+        className="rounded-xl border p-5 shadow-lg"
+        style={{
+          borderColor: "var(--color-border)",
+          backgroundColor: "var(--color-surface)"
+        }}
+      >
+        <h2 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>Memories</h2>
+        {isLoading ? (
+          <p className="text-sm" style={{ color: "var(--color-text-tertiary)" }}>Syncing background learnings…</p>
+        ) : null}
+        {error ? (
+          <p className="text-sm" style={{ color: "var(--color-error)" }}>{error}</p>
+        ) : null}
+        <div className="mt-4 grid gap-3">
+          {displayedMemories.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>Learning memories will appear here once the agent reflects.</p>
           ) : (
-            memories.map((memory) => <MemoryCard key={memory.id} memory={memory} />)
-          )}
-        </div>
-      </section>
-      <section>
-        <h2 className="text-base font-semibold text-neutral-900">Patterns</h2>
-        <div className="mt-3 grid gap-3">
-          {patterns.length === 0 ? (
-            <p className="text-sm text-neutral-500">The agent will list reusable tactics and anti-patterns as it works.</p>
-          ) : (
-            patterns.map((pattern) => <PatternCard key={pattern.id} pattern={pattern} />)
-          )}
-        </div>
-      </section>
-      <section>
-        <h2 className="text-base font-semibold text-neutral-900">Learning Queue</h2>
-        <div className="mt-3 grid gap-3">
-          {learningQueue.length === 0 ? (
-            <p className="text-sm text-neutral-500">Pending evaluations appear here during narrative learning.</p>
-          ) : (
-            learningQueue.map((item, index) => <QueueCard key={`${item.task}-${index}`} item={item} />)
+            displayedMemories.map((memory) => <MemoryCard key={memory.id} memory={memory} />)
           )}
         </div>
       </section>

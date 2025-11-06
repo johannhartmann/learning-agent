@@ -1,8 +1,10 @@
 """Enhanced Python sandbox tool with visualization support and error feedback."""
 
+import logging
 from typing import Annotated, Any
 
 from langchain_core.messages import ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolCallId, tool
 from langchain_sandbox.pyodide import PyodideSandbox
 from langgraph.prebuilt import InjectedState
@@ -11,18 +13,24 @@ from langgraph.types import Command
 from learning_agent.state import LearningAgentState
 
 
+logger = logging.getLogger(__name__)
+
+
 # Note: TypeScript source is now baked into Docker image via LANGCHAIN_SANDBOX_TS_PATH
 # No need to patch at runtime - pyodide.py handles this correctly now
 
 
 class EnhancedSandbox:
-    """Enhanced sandbox with visualization and data output support."""
+    """Enhanced sandbox with visualization and MCP code-mode support."""
 
-    def __init__(self, allow_network: bool = False):
+    def __init__(
+        self, allow_network: bool = False, mcp_servers: dict[str, dict[str, Any]] | None = None
+    ):
         """Initialize the enhanced sandbox.
 
         Args:
             allow_network: Whether to allow network access for package installation
+            mcp_servers: Optional MCP server configurations for code-mode
         """
         # Enable sandbox with network access control
         # Need to allow read/write access to Deno cache directory for pyodide files
@@ -46,8 +54,69 @@ class EnhancedSandbox:
         )
         self.session_state = None
 
+        # MCP code-mode support
+        self.mcp_servers = mcp_servers or {}
+        self.mcp_bridge: Any = None
+        self.mcp_apis: dict[str, Any] = {}
+        self.mcp_loaded = False
+
+    async def _load_mcp_apis(self) -> None:
+        """Load MCP APIs from remote servers into sandbox globals."""
+        if self.mcp_loaded or not self.mcp_servers:
+            return
+
+        try:
+            from learning_agent.sandbox.api_generator import generate_api_class
+            from learning_agent.sandbox.mcp_http_bridge import MCPHttpBridge
+
+            # Create HTTP bridge
+            self.mcp_bridge = MCPHttpBridge(self.mcp_servers)
+
+            # Generate API for each server
+            for server_name, config in self.mcp_servers.items():
+                logger.info(f"Loading MCP API for server: {server_name}")
+
+                try:
+                    # Fetch tools from remote server
+                    tools = await self.mcp_bridge.list_tools(server_name)
+
+                    # Generate Python API class code
+                    api_code = await generate_api_class(server_name, config["url"], tools)
+
+                    # Create API instance by executing generated code
+                    # and binding it to the MCP bridge client
+                    namespace: dict[str, Any] = {}
+                    exec(api_code, namespace)  # nosec B102 - Generated code is trusted
+
+                    # Find the API class (should be {ServerName}API)
+                    api_class = None
+                    for name, obj in namespace.items():
+                        if name.endswith("API") and isinstance(obj, type):
+                            api_class = obj
+                            break
+
+                    if api_class:
+                        # Get client for this server
+                        client = await self.mcp_bridge.connect_server(server_name)
+                        # Instantiate API with client
+                        self.mcp_apis[server_name] = api_class(client)
+                        logger.info(f"Loaded MCP API: {server_name}")
+                    else:
+                        logger.warning(
+                            f"Could not find API class in generated code for {server_name}"
+                        )
+
+                except Exception as e:
+                    logger.error(f"Failed to load MCP API for {server_name}: {e}", exc_info=True)
+
+            self.mcp_loaded = True
+            logger.info(f"Loaded {len(self.mcp_apis)} MCP APIs")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize MCP code-mode: {e}", exc_info=True)
+
     async def execute_with_viz(self, code: str) -> dict[str, Any]:
-        """Execute code with visualization capture.
+        """Execute code with visualization capture and MCP API injection.
 
         Args:
             code: Python code to execute
@@ -55,8 +124,38 @@ class EnhancedSandbox:
         Returns:
             Dictionary with stdout, stderr, files, and execution metadata
         """
+        # Load MCP APIs if configured
+        if self.mcp_servers and not self.mcp_loaded:
+            await self._load_mcp_apis()
+
+        # Inject MCP namespace if available
+        if self.mcp_apis:
+            # Prepend code to inject mcp global
+            api_repr = {k: f"<{k} API>" for k in self.mcp_apis}
+            injected_code = f"""
+# MCP Code-Mode: Remote MCP APIs injected
+import sys
+class _MCPProxy:
+    def __init__(self, apis):
+        self._apis = apis
+        for name, api in apis.items():
+            setattr(self, name.replace('-', '_'), api)
+
+    def list_servers(self):
+        return list(self._apis.keys())
+
+# Inject mcp into globals
+mcp = _MCPProxy({api_repr!r})
+
+# User code
+{code}
+"""
+            code_to_execute = injected_code
+        else:
+            code_to_execute = code
+
         try:
-            result = await self.sandbox.execute(code)
+            result = await self.sandbox.execute(code_to_execute)
         except Exception as e:
             return {
                 "success": False,
@@ -154,6 +253,7 @@ async def python_sandbox(
     code: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
     state: Annotated[LearningAgentState, InjectedState],
+    config: RunnableConfig,
     reset_state: bool = False,
 ) -> Command[Any]:
     """Execute Python code in a secure sandbox environment.
@@ -287,13 +387,21 @@ async def python_sandbox(
 
         if result.get("files"):
             response_parts.append(f"\n**Generated {len(result['files'])} file(s):**\n")
+
+            # Get thread_id from LangGraph config
+            thread_id = config.get("configurable", {}).get("thread_id")
             for file_path in result["files"]:
-                response_parts.append(f"- {file_path}\n")
-                # Add image display for image files
                 if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".svg")):
-                    response_parts.append(
-                        f"![{file_path.split('/')[-1]}](sandbox-file:{file_path})\n"
-                    )
+                    # Use absolute URL with thread_id in path so markdown parser accepts it
+                    if thread_id:
+                        file_url = (
+                            f"http://localhost:10300/api/internal/files/{thread_id}{file_path}"
+                        )
+                    else:
+                        file_url = f"http://localhost:10300/api/internal/files{file_path}"
+                    response_parts.append(f"![{file_path.split('/')[-1]}]({file_url})\n")
+                else:
+                    response_parts.append(f"- {file_path}\n")
 
         if result.get("tables"):
             response_parts.append(f"\n**Generated {len(result['tables'])} table(s)**")
