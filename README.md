@@ -344,6 +344,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ## 📚 Documentation
 
+- [Learning System Architecture](learning.md) - Deep dive into how the agent captures, stores, and retrieves knowledge
 - [Testing Strategy](tests/README.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
 
